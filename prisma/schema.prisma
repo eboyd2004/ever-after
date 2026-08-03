@@ -29,6 +29,34 @@ enum MembershipStatus {
   @@map("membership_status")
 }
 
+enum TaskStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  WAITING
+  COMPLETED
+  CANCELLED
+
+  @@map("task_status")
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+
+  @@map("task_priority")
+}
+
+enum TaskRecurrenceFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+
+  @@map("task_recurrence_frequency")
+}
+
 model User {
   id              String   @id @default(uuid()) @db.Uuid
   authProviderId  String   @unique @map("auth_provider_id")
@@ -81,7 +109,9 @@ model Wedding {
 
   // Application/service-level rule: every wedding must retain at least one
   // active OWNER. Prisma cannot enforce this cross-row invariant by itself.
-  members WeddingMember[] @relation("WeddingMemberships")
+  members        WeddingMember[] @relation("WeddingMemberships")
+  taskCategories TaskCategory[]  @relation("WeddingTaskCategories")
+  tasks          Task[]          @relation("WeddingTasks")
 
   @@index([weddingDate], map: "weddings_wedding_date_idx")
   @@map("weddings")
@@ -102,10 +132,106 @@ model WeddingMember {
   // deleting this row, preserving membership history for the wedding.
   wedding Wedding @relation("WeddingMemberships", fields: [weddingId], references: [id], onDelete: Cascade)
   user    User    @relation("UserWeddingMemberships", fields: [userId], references: [id], onDelete: Restrict)
+  tasks   Task[]  @relation("WeddingMemberAssignedTasks")
 
   @@unique([weddingId, userId], map: "wedding_members_wedding_id_user_id_key")
   @@index([weddingId], map: "wedding_members_wedding_id_idx")
   @@index([userId], map: "wedding_members_user_id_idx")
   @@index([weddingId, role, status], map: "wedding_members_wedding_id_role_status_idx")
   @@map("wedding_members")
+}
+
+model TaskCategory {
+  id        String   @id @default(uuid()) @db.Uuid
+  weddingId String   @map("wedding_id") @db.Uuid
+  name      String
+  icon      String?
+  colour    String?
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  wedding Wedding @relation("WeddingTaskCategories", fields: [weddingId], references: [id], onDelete: Cascade)
+  tasks   Task[]  @relation("TaskCategoryTasks")
+
+  // Category deletion requires a service-level workflow to move tasks,
+  // explicitly delete the category and its tasks, or cancel the operation.
+  @@unique([weddingId, name], map: "task_categories_wedding_id_name_key")
+  @@index([weddingId], map: "task_categories_wedding_id_idx")
+  @@index([position], map: "task_categories_position_idx")
+  @@map("task_categories")
+}
+
+model Task {
+  id           String       @id @default(uuid()) @db.Uuid
+  weddingId    String       @map("wedding_id") @db.Uuid
+  categoryId   String       @map("category_id") @db.Uuid
+  assigneeId   String?      @map("assignee_id") @db.Uuid
+  parentTaskId String?      @map("parent_task_id") @db.Uuid
+  title        String
+  description  String?
+  status       TaskStatus   @default(NOT_STARTED)
+  priority     TaskPriority @default(MEDIUM)
+  dueDate      DateTime?    @map("due_date") @db.Date
+  completedAt  DateTime?    @map("completed_at")
+  position     Int          @default(0)
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  wedding    Wedding         @relation("WeddingTasks", fields: [weddingId], references: [id], onDelete: Cascade)
+  category   TaskCategory    @relation("TaskCategoryTasks", fields: [categoryId], references: [id], onDelete: Restrict)
+  assignee   WeddingMember?  @relation("WeddingMemberAssignedTasks", fields: [assigneeId], references: [id], onDelete: SetNull)
+  parentTask Task?           @relation("TaskParentChild", fields: [parentTaskId], references: [id], onDelete: SetNull)
+  childTasks Task[]          @relation("TaskParentChild")
+  links      TaskLink[]      @relation("TaskLinks")
+  recurrence TaskRecurrence? @relation("TaskRecurrence")
+
+  // Service-level validation must ensure category, assignee, and parent task
+  // all belong to this task's Wedding; Prisma cannot enforce that across FKs.
+  // SetNull preserves subtasks when a parent is deleted; deletion semantics
+  // still require application confirmation.
+  @@index([weddingId], map: "tasks_wedding_id_idx")
+  @@index([categoryId], map: "tasks_category_id_idx")
+  @@index([assigneeId], map: "tasks_assignee_id_idx")
+  @@index([parentTaskId], map: "tasks_parent_task_id_idx")
+  @@index([status], map: "tasks_status_idx")
+  @@index([priority], map: "tasks_priority_idx")
+  @@index([dueDate], map: "tasks_due_date_idx")
+  @@index([weddingId, status], map: "tasks_wedding_id_status_idx")
+  @@index([weddingId, dueDate], map: "tasks_wedding_id_due_date_idx")
+  @@map("tasks")
+}
+
+model TaskLink {
+  id        String   @id @default(uuid()) @db.Uuid
+  taskId    String   @map("task_id") @db.Uuid
+  label     String?
+  url       String
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  task Task @relation("TaskLinks", fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId], map: "task_links_task_id_idx")
+  @@index([taskId, position], map: "task_links_task_id_position_idx")
+  @@map("task_links")
+}
+
+model TaskRecurrence {
+  id               String                  @id @default(uuid()) @db.Uuid
+  taskId           String                  @unique @map("task_id") @db.Uuid
+  frequency        TaskRecurrenceFrequency
+  interval         Int                     @default(1)
+  startsOn         DateTime?               @map("starts_on") @db.Date
+  endsOn           DateTime?               @map("ends_on") @db.Date
+  nextOccurrenceAt DateTime?               @map("next_occurrence_at")
+  createdAt        DateTime                @default(now()) @map("created_at")
+  updatedAt        DateTime                @updatedAt @map("updated_at")
+
+  task Task @relation("TaskRecurrence", fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([nextOccurrenceAt], map: "task_recurrences_next_occurrence_at_idx")
+  @@index([frequency], map: "task_recurrences_frequency_idx")
+  @@map("task_recurrences")
 }
