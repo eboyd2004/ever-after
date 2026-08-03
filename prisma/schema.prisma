@@ -1,0 +1,111 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum WeddingMemberRole {
+  OWNER
+  EDITOR
+  VIEWER
+
+  @@map("wedding_member_role")
+}
+
+enum MembershipStatus {
+  INVITED
+  ACTIVE
+  LEFT
+  REMOVED
+
+  @@map("membership_status")
+}
+
+model User {
+  id              String   @id @default(uuid()) @db.Uuid
+  authProviderId  String   @unique @map("auth_provider_id")
+  email           String   @unique
+  firstName       String   @map("first_name")
+  lastName        String   @map("last_name")
+  profileImageUrl String?  @map("profile_image_url")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  preference         UserPreference? @relation("UserPreferenceUser")
+  weddingMemberships WeddingMember[] @relation("UserWeddingMemberships")
+
+  @@index([lastName, firstName], map: "users_name_idx")
+  @@map("users")
+}
+
+model UserPreference {
+  id                          String   @id @default(uuid()) @db.Uuid
+  userId                      String   @unique @map("user_id") @db.Uuid
+  theme                       String
+  timezone                    String?
+  emailNotificationsEnabled   Boolean  @map("email_notifications_enabled")
+  taskNotificationsEnabled    Boolean  @map("task_notifications_enabled")
+  paymentNotificationsEnabled Boolean  @map("payment_notifications_enabled")
+  additionalPreferences       Json?    @map("additional_preferences") @db.JsonB
+  createdAt                   DateTime @default(now()) @map("created_at")
+  updatedAt                   DateTime @updatedAt @map("updated_at")
+
+  user User @relation("UserPreferenceUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+model Wedding {
+  id                         String   @id @default(uuid()) @db.Uuid
+  name                       String
+  partnerOneName             String   @map("partner_one_name")
+  partnerTwoName             String   @map("partner_two_name")
+  weddingDate                DateTime @map("wedding_date") @db.Date
+  ceremonyLocation           String?  @map("ceremony_location")
+  receptionLocation          String?  @map("reception_location")
+  timezone                   String
+  currencyCode               String   @map("currency_code")
+  totalBudgetMinor           BigInt?  @map("total_budget_minor")
+  mealChoicesEnabled         Boolean  @map("meal_choices_enabled")
+  dietaryRequirementsEnabled Boolean  @map("dietary_requirements_enabled")
+  createdAt                  DateTime @default(now()) @map("created_at")
+  updatedAt                  DateTime @updatedAt @map("updated_at")
+
+  // Application/service-level rule: every wedding must retain at least one
+  // active OWNER. Prisma cannot enforce this cross-row invariant by itself.
+  members WeddingMember[] @relation("WeddingMemberships")
+
+  @@index([weddingDate], map: "weddings_wedding_date_idx")
+  @@map("weddings")
+}
+
+model WeddingMember {
+  id        String            @id @default(uuid()) @db.Uuid
+  weddingId String            @map("wedding_id") @db.Uuid
+  userId    String            @map("user_id") @db.Uuid
+  role      WeddingMemberRole
+  status    MembershipStatus
+  joinedAt  DateTime?         @map("joined_at")
+  leftAt    DateTime?         @map("left_at")
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+
+  // Leave/remove operations should update status and leftAt rather than
+  // deleting this row, preserving membership history for the wedding.
+  wedding Wedding @relation("WeddingMemberships", fields: [weddingId], references: [id], onDelete: Cascade)
+  user    User    @relation("UserWeddingMemberships", fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([weddingId, userId], map: "wedding_members_wedding_id_user_id_key")
+  @@index([weddingId], map: "wedding_members_wedding_id_idx")
+  @@index([userId], map: "wedding_members_user_id_idx")
+  @@index([weddingId, role, status], map: "wedding_members_wedding_id_role_status_idx")
+  @@map("wedding_members")
+}
