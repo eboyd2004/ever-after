@@ -67,6 +67,14 @@ export type CategoryActionData = {
   updatedAt: string;
 };
 
+export type AssignableMemberActionData = {
+  id: string;
+  userId: string;
+  firstName: string;
+  lastName: string;
+  profileImageUrl: string | null;
+};
+
 type AssigneeActionData = {
   id: string;
   weddingId: string;
@@ -165,6 +173,16 @@ type RepositoryAssigneeRecord = {
   };
 };
 
+type RepositoryAssignableMemberRecord = {
+  id: string;
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    profileImageUrl: string | null;
+  };
+};
+
 type RepositoryLinkRecord = {
   id: string;
   taskId: string;
@@ -212,6 +230,13 @@ type RepositoryTaskRecord = {
 
 function failure<T = never>(error: string): ActionResult<T> {
   return { success: false, error };
+}
+
+class ChecklistValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ChecklistValidationError";
+  }
 }
 
 function isParseError<T>(result: ParseResult<T>): result is { error: string } {
@@ -591,6 +616,18 @@ function mapCategorySummary(
   };
 }
 
+function mapAssignableMember(
+  member: RepositoryAssignableMemberRecord,
+): AssignableMemberActionData {
+  return {
+    id: member.id,
+    userId: member.user.id,
+    firstName: member.user.firstName,
+    lastName: member.user.lastName,
+    profileImageUrl: member.user.profileImageUrl,
+  };
+}
+
 function mapAssignee(
   assignee: RepositoryAssigneeRecord | null | undefined,
 ): AssigneeActionData | null {
@@ -703,6 +740,10 @@ async function runAction<T>(
       return failure("Create or select a wedding before using the checklist.");
     }
 
+    if (error instanceof ChecklistValidationError) {
+      return failure(error.message);
+    }
+
     if (error instanceof PermissionDeniedError) {
       return failure(error.message);
     }
@@ -739,10 +780,60 @@ async function requireTaskInWedding(taskId: string, weddingId: string) {
   return task;
 }
 
+async function requireActiveAssigneeInWedding(
+  assigneeId: string,
+  weddingId: string,
+) {
+  const assignee = await checklistRepository.findWeddingMember(assigneeId);
+
+  if (
+    !assignee ||
+    assignee.weddingId !== weddingId ||
+    assignee.status !== "ACTIVE"
+  ) {
+    throw new ChecklistValidationError(
+      "Selected assignee is not part of this wedding.",
+    );
+  }
+
+  return assignee;
+}
+
+async function requireParentTaskInWedding(
+  parentTaskId: string,
+  weddingId: string,
+) {
+  const parentChain = await checklistRepository.findTaskParentChain(parentTaskId);
+
+  if (!parentChain || parentChain.chain.some((task) => task.weddingId !== weddingId)) {
+    throw new ChecklistValidationError(
+      "Parent task does not belong to this wedding.",
+    );
+  }
+
+  if (parentChain.hasCycle) {
+    throw new ChecklistValidationError("Parent task would create a cycle.");
+  }
+
+  return parentChain.chain[0];
+}
+
 export async function getCategories(): Promise<ActionResult<CategoryActionData[]>> {
   return runAction("load categories", "read", async (context) => {
     const categories = await checklistRepository.getCategories(context.wedding.id);
     return categories.map(mapCategory);
+  });
+}
+
+export async function getAssignableMembers(): Promise<
+  ActionResult<AssignableMemberActionData[]>
+> {
+  return runAction("load checklist members", "read", async (context) => {
+    const members = await checklistRepository.getActiveWeddingMembers(
+      context.wedding.id,
+    );
+
+    return members.map(mapAssignableMember);
   });
 }
 
@@ -958,6 +1049,24 @@ export async function createTask(
 
   return runAction("create task", "edit", async (context) => {
     await requireCategoryInWedding(data.categoryId, context.wedding.id);
+
+    if (data.assigneeId) {
+      await requireActiveAssigneeInWedding(
+        data.assigneeId,
+        context.wedding.id,
+      );
+    }
+
+    if (data.parentTaskId) {
+      // The repository generates a new task ID, so a new task cannot point to
+      // itself. Checking the complete existing ancestry also rejects any
+      // already-cyclic parent graph before it is extended.
+      await requireParentTaskInWedding(
+        data.parentTaskId,
+        context.wedding.id,
+      );
+    }
+
     const task = await checklistRepository.createTask({
       ...data,
       weddingId: context.wedding.id,

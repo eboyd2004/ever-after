@@ -12,6 +12,7 @@ type CategorySectionProps = CategoryViewModel & {
 export function CategorySection({
   category,
   canEdit,
+  members,
   tasks,
   createTaskAction,
   deleteCategoryAction,
@@ -62,6 +63,7 @@ export function CategorySection({
           category={category}
           createTaskAction={createTaskAction}
           deleteCategoryAction={deleteCategoryAction}
+          members={members}
           updateCategoryAction={updateCategoryAction}
         />
       ) : null}

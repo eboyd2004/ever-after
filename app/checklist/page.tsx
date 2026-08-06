@@ -5,6 +5,7 @@ import {
   createTask as createTaskAction,
   deleteCategory as deleteCategoryAction,
   getCategories,
+  getAssignableMembers,
   getTasks,
   reopenTask as reopenTaskAction,
   updateCategory as updateCategoryAction,
@@ -14,6 +15,7 @@ import { ChecklistPageHeader } from "@/src/components/checklist/checklist-page-h
 import { ChecklistProgressOverview } from "@/src/components/checklist/checklist-progress-overview";
 import { ChecklistToolbar } from "@/src/components/checklist/checklist-toolbar";
 import type {
+  AssignableMemberActionData,
   CategoryActionData,
   TaskActionData,
 } from "@/src/server/actions/checklist/checklist.actions";
@@ -40,6 +42,7 @@ type LoadedChecklistData = {
     category: CategoryActionData;
     tasks: TaskActionData[];
   }>;
+  members: AssignableMemberActionData[];
 };
 
 async function loadChecklistData(): Promise<
@@ -66,7 +69,13 @@ async function loadChecklistData(): Promise<
       categories.push({ category, tasks: tasksResult.data });
     }
 
-    return { data: { context, categories } };
+    const membersResult = await getAssignableMembers();
+
+    if (!membersResult.success) {
+      return { error: membersResult.error };
+    }
+
+    return { data: { context, categories, members: membersResult.data } };
   } catch (error) {
     console.error("[checklist] page data load failed", error);
     return { error: getErrorMessage(error) };
@@ -94,7 +103,7 @@ export default async function ChecklistPage() {
     return <ChecklistError message={loaded.error} />;
   }
 
-  const { context, categories } = loaded.data;
+  const { context, categories, members } = loaded.data;
   const canEdit = context.role !== "VIEWER";
 
   const allTasks = categories.flatMap(({ tasks }) => tasks);
@@ -179,6 +188,7 @@ export default async function ChecklistPage() {
 
     categoryViewModels.push({
       category,
+      members,
       tasks: taskViewModels,
       createTaskAction: createTaskForCategory,
       updateCategoryAction: updateCategoryForWedding,

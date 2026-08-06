@@ -1,4 +1,5 @@
 import type {
+  AssignableMemberActionData,
   ActionResult,
   CategoryActionData,
   TaskActionData,
@@ -16,6 +17,8 @@ export type CreateTaskAction = (
   input: unknown,
 ) => Promise<ActionResult<TaskActionData>>;
 
+export type ChecklistMember = AssignableMemberActionData;
+
 export type TaskMutationAction = () => Promise<ActionResult<TaskActionData>>;
 
 export type TaskViewModel = {
@@ -27,6 +30,7 @@ export type TaskViewModel = {
 export type CategoryViewModel = {
   category: CategoryActionData;
   tasks: TaskViewModel[];
+  members: ChecklistMember[];
   createTaskAction: CreateTaskAction;
   updateCategoryAction: UpdateCategoryAction;
   deleteCategoryAction: DeleteCategoryAction;

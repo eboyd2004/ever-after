@@ -1,5 +1,6 @@
 import type { Prisma } from "../../../app/generated/prisma/client";
 import {
+  MembershipStatus,
   TaskPriority,
   TaskRecurrenceFrequency,
   TaskStatus,
@@ -119,6 +120,12 @@ export type PositionUpdate = {
   position: number;
 };
 
+type TaskParentRecord = {
+  id: string;
+  weddingId: string;
+  parentTaskId: string | null;
+};
+
 export class ChecklistRepositoryError extends Error {
   constructor(message: string) {
     super(message);
@@ -207,16 +214,76 @@ export class ChecklistRepository {
 
   async getWeddingMember(id: string) {
     return this.execute("load wedding member", async () => {
-      const member = await prisma.weddingMember.findUnique({
-        where: { id },
-        select: { id: true, weddingId: true, status: true },
-      });
+      const member = await this.findWeddingMember(id);
 
       if (!member) {
         throw new ChecklistRepositoryError("Wedding member not found");
       }
 
       return member;
+    });
+  }
+
+  async findWeddingMember(id: string) {
+    return this.execute("find wedding member", () =>
+      prisma.weddingMember.findUnique({
+        where: { id },
+        select: { id: true, weddingId: true, status: true },
+      }),
+    );
+  }
+
+  async getActiveWeddingMembers(weddingId: string) {
+    return this.execute("load active wedding members", () =>
+      prisma.weddingMember.findMany({
+        where: {
+          weddingId,
+          status: MembershipStatus.ACTIVE,
+        },
+        select: {
+          id: true,
+          createdAt: true,
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              profileImageUrl: true,
+            },
+          },
+        },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      }),
+    );
+  }
+
+  async findTaskParentChain(id: string) {
+    return this.execute("find task parent chain", async () => {
+      const chain: TaskParentRecord[] = [];
+      const visited = new Set<string>();
+      let currentId: string | null = id;
+
+      while (currentId !== null) {
+        if (visited.has(currentId)) {
+          return { chain, hasCycle: true };
+        }
+
+        visited.add(currentId);
+
+        const task: TaskParentRecord | null = await prisma.task.findUnique({
+          where: { id: currentId },
+          select: { id: true, weddingId: true, parentTaskId: true },
+        });
+
+        if (!task) {
+          return null;
+        }
+
+        chain.push(task);
+        currentId = task.parentTaskId;
+      }
+
+      return { chain, hasCycle: false };
     });
   }
 

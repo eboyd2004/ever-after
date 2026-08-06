@@ -16,6 +16,7 @@ type CategoryActionsProps = Pick<
   | "category"
   | "createTaskAction"
   | "deleteCategoryAction"
+  | "members"
   | "updateCategoryAction"
 >;
 
@@ -23,6 +24,7 @@ export function CategoryActions({
   category,
   createTaskAction,
   deleteCategoryAction,
+  members,
   updateCategoryAction,
 }: CategoryActionsProps) {
   const router = useRouter();
@@ -51,7 +53,7 @@ export function CategoryActions({
   return (
     <>
       <div className="flex flex-wrap items-center justify-end gap-2 border-b border-[#F4F4F1] px-4 py-2.5 sm:px-5">
-        <CreateTaskForm action={createTaskAction} compact />
+        <CreateTaskForm action={createTaskAction} compact members={members} />
         <button
           className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-[#6B6B63] transition hover:bg-[#F4F4F1] hover:text-[#1C1C1C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2D5A27]"
           onClick={() => {

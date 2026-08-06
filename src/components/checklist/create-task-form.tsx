@@ -5,14 +5,19 @@ import type { FormEvent } from "react";
 
 import { Icon } from "../shared/icons";
 import { Modal } from "../shared/modal";
-import type { CreateTaskAction } from "./types";
+import type { ChecklistMember, CreateTaskAction } from "./types";
 
 type CreateTaskFormProps = {
   action: CreateTaskAction;
   compact?: boolean;
+  members: ChecklistMember[];
 };
 
-export function CreateTaskForm({ action, compact = false }: CreateTaskFormProps) {
+export function CreateTaskForm({
+  action,
+  compact = false,
+  members,
+}: CreateTaskFormProps) {
   const [isPending, startTransition] = useTransition();
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -47,11 +52,13 @@ export function CreateTaskForm({ action, compact = false }: CreateTaskFormProps)
     }
 
     const dueDate = String(formData.get("dueDate") ?? "").trim();
+    const assigneeId = String(formData.get("assigneeId") ?? "").trim();
     const input = {
       title,
       description: String(formData.get("description") ?? "").trim() || undefined,
       priority: String(formData.get("priority") ?? "MEDIUM"),
       dueDate: dueDate || undefined,
+      ...(assigneeId ? { assigneeId } : {}),
     };
 
     setMessage(null);
@@ -141,6 +148,24 @@ export function CreateTaskForm({ action, compact = false }: CreateTaskFormProps)
                 type="date"
                 className="w-full rounded-[10px] border border-[#E8E8E3] px-3 py-2 text-sm outline-none transition focus:border-[#2D5A27] focus:ring-2 focus:ring-[#EAF0E8]"
               />
+            </label>
+
+            <label className="sm:col-span-2">
+              <span className="mb-1 block text-xs font-medium text-[#6B6B63]">
+                Assignee
+              </span>
+              <select
+                className="w-full rounded-[10px] border border-[#E8E8E3] bg-white px-3 py-2 text-sm outline-none transition focus:border-[#2D5A27] focus:ring-2 focus:ring-[#EAF0E8]"
+                defaultValue=""
+                name="assigneeId"
+              >
+                <option value="">Unassigned</option>
+                {members.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.firstName} {member.lastName}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
 
