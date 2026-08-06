@@ -1,0 +1,99 @@
+"use client";
+
+import { useState } from "react";
+
+import { Badge } from "../shared/ui";
+import { TaskStatusButton } from "./task-status-button";
+import type { TaskViewModel } from "./types";
+
+type TaskRowProps = TaskViewModel & {
+  canEdit: boolean;
+};
+
+function formatStatus(status: string) {
+  return status
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function formatDate(value: string | null) {
+  if (!value) return null;
+
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+  }).format(new Date(value));
+}
+
+function priorityTone(priority: string) {
+  switch (priority) {
+    case "HIGH":
+    case "URGENT":
+      return "danger" as const;
+    case "MEDIUM":
+      return "warning" as const;
+    case "LOW":
+      return "success" as const;
+    default:
+      return "default" as const;
+  }
+}
+
+function assigneeLabel(task: TaskViewModel["task"]) {
+  if (!task.assignee) return "Unassigned";
+
+  if (task.assignee.user) {
+    return `${task.assignee.user.firstName} ${task.assignee.user.lastName}`;
+  }
+
+  return "Assigned";
+}
+
+export function TaskRow({ canEdit, task, completeAction, reopenAction }: TaskRowProps) {
+  const [optimisticStatus, setOptimisticStatus] = useState(task.status);
+  const completed = optimisticStatus === "COMPLETED";
+  const dueDate = formatDate(task.dueDate);
+
+  return (
+    <li className="flex items-start gap-3 rounded-lg px-2.5 py-2.5 transition-colors hover:bg-[#F7F7F4]">
+      {canEdit ? (
+        <TaskStatusButton
+          completed={completed}
+          completeAction={completeAction}
+          onOptimisticChange={(nextCompleted) =>
+            setOptimisticStatus(nextCompleted ? "COMPLETED" : "NOT_STARTED")
+          }
+          reopenAction={reopenAction}
+        />
+      ) : null}
+
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <h3
+              className={`truncate text-[13.5px] font-medium ${completed ? "text-[#8A8A82] line-through" : "text-[#1C1C1C]"}`}
+            >
+              {task.title}
+            </h3>
+            {task.description ? (
+              <p className="mt-0.5 truncate text-[11.5px] text-[#8A8A82]">
+                {task.description}
+              </p>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11.5px] text-[#8A8A82]">
+          <Badge>{formatStatus(optimisticStatus)}</Badge>
+          <Badge tone={priorityTone(task.priority)}>
+            {formatStatus(task.priority)}
+          </Badge>
+          {dueDate ? <span className="whitespace-nowrap">{dueDate}</span> : null}
+          <span className="whitespace-nowrap">{assigneeLabel(task)}</span>
+        </div>
+      </div>
+    </li>
+  );
+}

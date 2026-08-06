@@ -2,6 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import {
+  ActiveWeddingRequiredError,
+} from "../../auth/get-active-wedding";
+import type { ActiveWeddingContext } from "../../auth/get-active-wedding";
+import { AuthenticationRequiredError } from "../../auth/get-authenticated-user";
+import {
+  PermissionDeniedError,
+  requireRole,
+} from "../../auth/authorization";
+import {
   ChecklistRepositoryError,
   checklistRepository,
   type CreateCategoryInput as RepositoryCreateCategoryInput,
@@ -68,6 +77,12 @@ type AssigneeActionData = {
   leftAt: string | null;
   createdAt: string;
   updatedAt: string;
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    profileImageUrl: string | null;
+  } | null;
 };
 
 type LinkActionData = {
@@ -142,6 +157,12 @@ type RepositoryAssigneeRecord = {
   leftAt: DateValue | null;
   createdAt: DateValue;
   updatedAt: DateValue;
+  user?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    profileImageUrl: string | null;
+  };
 };
 
 type RepositoryLinkRecord = {
@@ -585,6 +606,14 @@ function mapAssignee(
     leftAt: parseIsoDate(assignee.leftAt),
     createdAt: parseIsoDate(assignee.createdAt) as string,
     updatedAt: parseIsoDate(assignee.updatedAt) as string,
+    user: assignee.user
+      ? {
+          id: assignee.user.id,
+          firstName: assignee.user.firstName,
+          lastName: assignee.user.lastName,
+          profileImageUrl: assignee.user.profileImageUrl,
+        }
+      : null,
   };
 }
 
@@ -656,14 +685,28 @@ function revalidateChecklistPaths() {
 
 async function runAction<T>(
   actionName: string,
-  operation: () => Promise<T>,
+  access: "read" | "edit",
+  operation: (context: ActiveWeddingContext) => Promise<T>,
 ): Promise<ActionResult<T>> {
-  // TODO(authentication): resolve and verify the current user in every action.
-  // TODO(workspace): derive and verify the current wedding instead of trusting IDs.
-  // TODO(permissions): enforce WeddingMember role and active membership rules.
   try {
-    return { success: true, data: await operation() };
+    const context = await requireRole(
+      access === "read" ? ["OWNER", "EDITOR", "VIEWER"] : ["OWNER", "EDITOR"],
+      { redirectToOnboarding: false },
+    );
+    return { success: true, data: await operation(context) };
   } catch (error) {
+    if (error instanceof AuthenticationRequiredError) {
+      return failure("Authentication is required.");
+    }
+
+    if (error instanceof ActiveWeddingRequiredError) {
+      return failure("Create or select a wedding before using the checklist.");
+    }
+
+    if (error instanceof PermissionDeniedError) {
+      return failure(error.message);
+    }
+
     if (error instanceof ChecklistRepositoryError) {
       return failure(error.message);
     }
@@ -673,16 +716,32 @@ async function runAction<T>(
   }
 }
 
-export async function getCategories(
-  weddingId: unknown,
-): Promise<ActionResult<CategoryActionData[]>> {
-  const parsedWeddingId = parseRequiredString(weddingId, "weddingId");
-  if (isParseError(parsedWeddingId)) return failure(parsedWeddingId.error);
+async function requireCategoryInWedding(
+  categoryId: string,
+  weddingId: string,
+) {
+  const category = await checklistRepository.getCategory(categoryId);
 
-  return runAction("load categories", async () => {
-    const categories = await checklistRepository.getCategories(
-      parsedWeddingId.value,
-    );
+  if (category.weddingId !== weddingId) {
+    throw new PermissionDeniedError();
+  }
+
+  return category;
+}
+
+async function requireTaskInWedding(taskId: string, weddingId: string) {
+  const task = await checklistRepository.getTask(taskId);
+
+  if (task.weddingId !== weddingId) {
+    throw new PermissionDeniedError();
+  }
+
+  return task;
+}
+
+export async function getCategories(): Promise<ActionResult<CategoryActionData[]>> {
+  return runAction("load categories", "read", async (context) => {
+    const categories = await checklistRepository.getCategories(context.wedding.id);
     return categories.map(mapCategory);
   });
 }
@@ -692,9 +751,6 @@ export async function createCategory(
 ): Promise<ActionResult<CategoryActionData>> {
   const record = parseRecord(input);
   if (isParseError(record)) return failure(record.error);
-
-  const weddingId = parseRequiredString(record.value.weddingId, "weddingId");
-  if (isParseError(weddingId)) return failure(weddingId.error);
 
   const name = parseRequiredString(
     record.value.name,
@@ -716,16 +772,29 @@ export async function createCategory(
   const position = parseOptionalPosition(record.value.position, "position");
   if (isParseError(position)) return failure(position.error);
 
-  const data: RepositoryCreateCategoryInput = {
-    weddingId: weddingId.value,
+  const data: Omit<RepositoryCreateCategoryInput, "weddingId"> = {
     name: name.value,
     ...(icon.value !== undefined ? { icon: icon.value } : {}),
     ...(colour.value !== undefined ? { colour: colour.value } : {}),
     ...(position.value !== undefined ? { position: position.value } : {}),
   };
 
-  return runAction("create category", async () => {
-    const category = await checklistRepository.createCategory(data);
+  return runAction("create category", "edit", async (context) => {
+    const nameExists = await checklistRepository.categoryNameExists(
+      context.wedding.id,
+      data.name,
+    );
+
+    if (nameExists) {
+      throw new ChecklistRepositoryError(
+        "A category with this name already exists in this wedding.",
+      );
+    }
+
+    const category = await checklistRepository.createCategory({
+      ...data,
+      weddingId: context.wedding.id,
+    });
     revalidateChecklistPaths();
     return mapCategory(category);
   });
@@ -783,7 +852,23 @@ export async function updateCategory(
     return failure("At least one category field must be provided");
   }
 
-  return runAction("update category", async () => {
+  return runAction("update category", "edit", async (context) => {
+    await requireCategoryInWedding(parsedId.value, context.wedding.id);
+
+    if (data.name !== undefined) {
+      const nameExists = await checklistRepository.categoryNameExists(
+        context.wedding.id,
+        data.name,
+        parsedId.value,
+      );
+
+      if (nameExists) {
+        throw new ChecklistRepositoryError(
+          "A category with this name already exists in this wedding.",
+        );
+      }
+    }
+
     const category = await checklistRepository.updateCategory(parsedId.value, data);
     revalidateChecklistPaths();
     return mapCategory(category);
@@ -796,7 +881,8 @@ export async function deleteCategory(
   const parsedId = parseRequiredString(id, "id");
   if (isParseError(parsedId)) return failure(parsedId.error);
 
-  return runAction("delete category", async () => {
+  return runAction("delete category", "edit", async (context) => {
+    await requireCategoryInWedding(parsedId.value, context.wedding.id);
     const category = await checklistRepository.deleteCategory(parsedId.value);
     revalidateChecklistPaths();
     return mapCategory(category);
@@ -804,18 +890,14 @@ export async function deleteCategory(
 }
 
 export async function reorderCategories(
-  weddingId: unknown,
   updates: unknown,
 ): Promise<ActionResult<null>> {
-  const parsedWeddingId = parseRequiredString(weddingId, "weddingId");
-  if (isParseError(parsedWeddingId)) return failure(parsedWeddingId.error);
-
   const parsedUpdates = parsePositionUpdates(updates, "categories");
   if (isParseError(parsedUpdates)) return failure(parsedUpdates.error);
 
-  return runAction("reorder categories", async () => {
+  return runAction("reorder categories", "edit", async (context) => {
     await checklistRepository.reorderCategories(
-      parsedWeddingId.value,
+      context.wedding.id,
       parsedUpdates.value,
     );
     revalidateChecklistPaths();
@@ -829,7 +911,8 @@ export async function getTasks(
   const parsedCategoryId = parseRequiredString(categoryId, "categoryId");
   if (isParseError(parsedCategoryId)) return failure(parsedCategoryId.error);
 
-  return runAction("load tasks", async () => {
+  return runAction("load tasks", "read", async (context) => {
+    await requireCategoryInWedding(parsedCategoryId.value, context.wedding.id);
     const tasks = await checklistRepository.getTasks(parsedCategoryId.value);
     return tasks.map(mapTask);
   });
@@ -841,7 +924,8 @@ export async function getTask(
   const parsedId = parseRequiredString(id, "id");
   if (isParseError(parsedId)) return failure(parsedId.error);
 
-  return runAction("load task", async () => {
+  return runAction("load task", "read", async (context) => {
+    await requireTaskInWedding(parsedId.value, context.wedding.id);
     const task = await checklistRepository.getTask(parsedId.value);
     return mapTask(task);
   });
@@ -852,9 +936,6 @@ export async function createTask(
 ): Promise<ActionResult<TaskActionData>> {
   const record = parseRecord(input);
   if (isParseError(record)) return failure(record.error);
-
-  const weddingId = parseRequiredString(record.value.weddingId, "weddingId");
-  if (isParseError(weddingId)) return failure(weddingId.error);
 
   const categoryId = parseRequiredString(record.value.categoryId, "categoryId");
   if (isParseError(categoryId)) return failure(categoryId.error);
@@ -869,15 +950,18 @@ export async function createTask(
   const optionalFields = parseTaskOptionalFields(record.value);
   if (isParseError(optionalFields)) return failure(optionalFields.error);
 
-  const data: RepositoryCreateTaskInput = {
-    weddingId: weddingId.value,
+  const data: Omit<RepositoryCreateTaskInput, "weddingId"> = {
     categoryId: categoryId.value,
     title: title.value,
     ...optionalFields.value,
   };
 
-  return runAction("create task", async () => {
-    const task = await checklistRepository.createTask(data);
+  return runAction("create task", "edit", async (context) => {
+    await requireCategoryInWedding(data.categoryId, context.wedding.id);
+    const task = await checklistRepository.createTask({
+      ...data,
+      weddingId: context.wedding.id,
+    });
     revalidateChecklistPaths();
     return mapTask(task);
   });
@@ -920,7 +1004,31 @@ export async function updateTask(
     return failure("At least one task field must be provided");
   }
 
-  return runAction("update task", async () => {
+  return runAction("update task", "edit", async (context) => {
+    const currentTask = await requireTaskInWedding(parsedId.value, context.wedding.id);
+
+    if (data.categoryId !== undefined) {
+      await requireCategoryInWedding(data.categoryId, context.wedding.id);
+    }
+
+    if (data.parentTaskId) {
+      if (data.parentTaskId === parsedId.value) {
+        throw new PermissionDeniedError();
+      }
+
+      await requireTaskInWedding(data.parentTaskId, context.wedding.id);
+    }
+
+    if (data.assigneeId) {
+      const assignee = await checklistRepository.getWeddingMember(data.assigneeId);
+      if (
+        assignee.weddingId !== currentTask.weddingId ||
+        assignee.status !== "ACTIVE"
+      ) {
+        throw new PermissionDeniedError();
+      }
+    }
+
     const task = await checklistRepository.updateTask(parsedId.value, data);
     revalidateChecklistPaths();
     return mapTask(task);
@@ -933,7 +1041,8 @@ export async function deleteTask(
   const parsedId = parseRequiredString(id, "id");
   if (isParseError(parsedId)) return failure(parsedId.error);
 
-  return runAction("delete task", async () => {
+  return runAction("delete task", "edit", async (context) => {
+    await requireTaskInWedding(parsedId.value, context.wedding.id);
     const task = await checklistRepository.deleteTask(parsedId.value);
     revalidateChecklistPaths();
     return mapTask(task);
@@ -946,7 +1055,8 @@ export async function completeTask(
   const parsedId = parseRequiredString(id, "id");
   if (isParseError(parsedId)) return failure(parsedId.error);
 
-  return runAction("complete task", async () => {
+  return runAction("complete task", "edit", async (context) => {
+    await requireTaskInWedding(parsedId.value, context.wedding.id);
     const task = await checklistRepository.completeTask(parsedId.value);
     revalidateChecklistPaths();
     return mapTask(task);
@@ -959,7 +1069,8 @@ export async function reopenTask(
   const parsedId = parseRequiredString(id, "id");
   if (isParseError(parsedId)) return failure(parsedId.error);
 
-  return runAction("reopen task", async () => {
+  return runAction("reopen task", "edit", async (context) => {
+    await requireTaskInWedding(parsedId.value, context.wedding.id);
     const task = await checklistRepository.reopenTask(parsedId.value);
     revalidateChecklistPaths();
     return mapTask(task);
@@ -976,7 +1087,8 @@ export async function reorderTasks(
   const parsedUpdates = parsePositionUpdates(updates, "tasks");
   if (isParseError(parsedUpdates)) return failure(parsedUpdates.error);
 
-  return runAction("reorder tasks", async () => {
+  return runAction("reorder tasks", "edit", async (context) => {
+    await requireCategoryInWedding(parsedCategoryId.value, context.wedding.id);
     await checklistRepository.reorderTasks(
       parsedCategoryId.value,
       parsedUpdates.value,

@@ -12,7 +12,11 @@ const taskLinksOrderBy = [
 ];
 
 const childTaskInclude = {
-  assignee: true,
+  assignee: {
+    include: {
+      user: true,
+    },
+  },
   recurrence: true,
   links: {
     orderBy: taskLinksOrderBy,
@@ -20,7 +24,11 @@ const childTaskInclude = {
 } satisfies Prisma.TaskInclude;
 
 const taskListInclude = {
-  assignee: true,
+  assignee: {
+    include: {
+      user: true,
+    },
+  },
   recurrence: true,
   links: {
     orderBy: taskLinksOrderBy,
@@ -144,6 +152,25 @@ export class ChecklistRepository {
     });
   }
 
+  async categoryNameExists(
+    weddingId: string,
+    name: string,
+    excludeId?: string,
+  ) {
+    return this.execute("check category name", async () => {
+      const category = await prisma.taskCategory.findFirst({
+        where: {
+          weddingId,
+          name: { equals: name, mode: "insensitive" },
+          ...(excludeId ? { id: { not: excludeId } } : {}),
+        },
+        select: { id: true },
+      });
+
+      return category !== null;
+    });
+  }
+
   async getTasks(categoryId: string) {
     return this.execute("load tasks", async () => {
       const category = await prisma.taskCategory.findUnique({
@@ -175,6 +202,21 @@ export class ChecklistRepository {
       }
 
       return task;
+    });
+  }
+
+  async getWeddingMember(id: string) {
+    return this.execute("load wedding member", async () => {
+      const member = await prisma.weddingMember.findUnique({
+        where: { id },
+        select: { id: true, weddingId: true, status: true },
+      });
+
+      if (!member) {
+        throw new ChecklistRepositoryError("Wedding member not found");
+      }
+
+      return member;
     });
   }
 
@@ -334,23 +376,16 @@ export class ChecklistRepository {
       prisma.$transaction(async (tx) => {
         const category = await tx.taskCategory.findUnique({
           where: { id },
-          select: {
-            id: true,
-            _count: {
-              select: { tasks: true },
-            },
-          },
+          select: { id: true },
         });
 
         if (!category) {
           throw new ChecklistRepositoryError("Category not found");
         }
 
-        if (category._count.tasks > 0) {
-          throw new ChecklistRepositoryError(
-            "Cannot delete category with existing tasks",
-          );
-        }
+        await tx.task.deleteMany({
+          where: { categoryId: id },
+        });
 
         return tx.taskCategory.delete({
           where: { id },
