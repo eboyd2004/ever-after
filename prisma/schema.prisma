@@ -247,12 +247,12 @@ model Guest {
   plusOnes            Guest[]              @relation("GuestPlusOne")
   tagAssignments      GuestTagAssignment[] @relation("GuestTagAssignments")
 
+  @@unique([plusOneForGuestId], map: "guests_plus_one_for_guest_id_key")
   // Service-level validation must ensure household and plus-one target belong
   // to this Guest's Wedding; tag assignments must also use this Wedding's
   // tags. Prisma cannot enforce these cross-record rules across foreign keys.
   @@index([weddingId], map: "guests_wedding_id_idx")
   @@index([householdId], map: "guests_household_id_idx")
-  @@index([plusOneForGuestId], map: "guests_plus_one_for_guest_id_idx")
   @@index([lastName], map: "guests_last_name_idx")
   @@index([email], map: "guests_email_idx")
   @@index([weddingId, lastName], map: "guests_wedding_id_last_name_idx")

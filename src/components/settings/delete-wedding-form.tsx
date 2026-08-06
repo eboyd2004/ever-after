@@ -28,7 +28,7 @@ export function DeleteWeddingForm({ weddingName }: DeleteWeddingFormProps) {
         return;
       }
 
-      router.push("/onboarding");
+      router.push(result.data.nextWeddingId ? "/dashboard" : "/onboarding");
       router.refresh();
     });
   }

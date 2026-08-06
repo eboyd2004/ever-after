@@ -1,3 +1,5 @@
+import "server-only";
+
 import type { Prisma } from "../../../app/generated/prisma/client";
 import {
   MembershipStatus,

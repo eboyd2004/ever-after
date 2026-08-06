@@ -21,6 +21,7 @@ import type {
 } from "@/src/server/actions/checklist/checklist.actions";
 import type { CategoryViewModel } from "@/src/components/checklist/types";
 import { requireWedding, type ActiveWeddingContext } from "@/src/server/auth/get-active-wedding";
+import { logger } from "@/src/server/logging/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -77,7 +78,7 @@ async function loadChecklistData(): Promise<
 
     return { data: { context, categories, members: membersResult.data } };
   } catch (error) {
-    console.error("[checklist] page data load failed", error);
+    logger.error("[checklist] page data load failed", error);
     return { error: getErrorMessage(error) };
   }
 }

@@ -10,6 +10,7 @@ import {
   getAuthenticatedUser,
 } from "@/src/server/auth/get-authenticated-user";
 import { getActiveWedding } from "@/src/server/auth/get-active-wedding";
+import { logger } from "@/src/server/logging/logger";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -50,7 +51,7 @@ async function getShellContext(): Promise<AppShellContext | null> {
     authenticatedUser = await getAuthenticatedUser();
   } catch (error) {
     if (!(error instanceof AuthenticationRequiredError)) {
-      console.error("[layout] authenticated user load failed", error);
+      logger.error("[layout] authenticated user load failed", error);
     }
 
     return null;
@@ -63,7 +64,7 @@ async function getShellContext(): Promise<AppShellContext | null> {
       redirectToOnboarding: false,
     });
   } catch (error) {
-    console.error("[layout] active wedding context load failed", error);
+    logger.error("[layout] active wedding context load failed", error);
   }
 
   let wedding: AppShellContext["wedding"] = null;

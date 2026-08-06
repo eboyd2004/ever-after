@@ -1,3 +1,5 @@
+import "server-only";
+
 import { randomUUID } from "node:crypto";
 
 import {
@@ -5,6 +7,7 @@ import {
   Prisma,
 } from "../../../app/generated/prisma/client";
 import { prisma } from "../db/prisma";
+import { logger } from "../logging/logger";
 
 export type HouseholdInput = {
   name: string;
@@ -163,7 +166,7 @@ export class HouseholdRepository {
         orderBy: [{ name: "asc" }],
       });
     } catch (error) {
-      console.error("[household-repository] list households failed", error);
+      logger.error("[household-repository] list households failed", error);
       throw new HouseholdRepositoryError("Unable to load households");
     }
   }
@@ -182,7 +185,7 @@ export class HouseholdRepository {
       return household;
     } catch (error) {
       if (error instanceof HouseholdRepositoryError) throw error;
-      console.error("[household-repository] get household failed", error);
+      logger.error("[household-repository] get household failed", error);
       throw new HouseholdRepositoryError("Unable to load household");
     }
   }
@@ -194,7 +197,7 @@ export class HouseholdRepository {
         include: householdInclude,
       });
     } catch (error) {
-      console.error("[household-repository] create household failed", error);
+      logger.error("[household-repository] create household failed", error);
       throw new HouseholdRepositoryError("Unable to create household");
     }
   }
@@ -270,7 +273,7 @@ export class HouseholdRepository {
       return this.getHousehold(weddingId, householdId);
     } catch (error) {
       if (error instanceof HouseholdRepositoryError) throw error;
-      console.error(
+      logger.error(
         "[household-repository] create household with guests failed",
         error,
       );
@@ -294,7 +297,7 @@ export class HouseholdRepository {
       });
     } catch (error) {
       if (error instanceof HouseholdRepositoryError) throw error;
-      console.error("[household-repository] update household failed", error);
+      logger.error("[household-repository] update household failed", error);
       throw new HouseholdRepositoryError("Unable to update household");
     }
   }
@@ -311,7 +314,7 @@ export class HouseholdRepository {
       ]);
     } catch (error) {
       if (error instanceof HouseholdRepositoryError) throw error;
-      console.error("[household-repository] delete household failed", error);
+      logger.error("[household-repository] delete household failed", error);
       throw new HouseholdRepositoryError("Unable to delete household");
     }
   }
@@ -344,7 +347,7 @@ export class HouseholdRepository {
       });
     } catch (error) {
       if (error instanceof HouseholdRepositoryError) throw error;
-      console.error("[household-repository] set primary guest failed", error);
+      logger.error("[household-repository] set primary guest failed", error);
       throw new HouseholdRepositoryError("Unable to update primary invitee");
     }
   }
@@ -390,7 +393,7 @@ export class HouseholdRepository {
       return this.getHousehold(weddingId, householdId);
     } catch (error) {
       if (error instanceof HouseholdRepositoryError) throw error;
-      console.error("[household-repository] add guests failed", error);
+      logger.error("[household-repository] add guests failed", error);
       throw new HouseholdRepositoryError("Unable to add guests to household");
     }
   }
@@ -417,7 +420,7 @@ export class HouseholdRepository {
       return this.getHousehold(weddingId, householdId);
     } catch (error) {
       if (error instanceof HouseholdRepositoryError) throw error;
-      console.error("[household-repository] remove guests failed", error);
+      logger.error("[household-repository] remove guests failed", error);
       throw new HouseholdRepositoryError(
         "Unable to remove guests from household",
       );

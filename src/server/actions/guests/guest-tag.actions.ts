@@ -7,6 +7,7 @@ import {
   PermissionDeniedError,
   requireRole,
 } from "../../auth/authorization";
+import { logger } from "../../logging/logger";
 import {
   GuestTagRepositoryError,
   guestTagRepository,
@@ -83,7 +84,7 @@ async function runTagAction<T>(
     if (error instanceof PermissionDeniedError) return failure(error.message);
     if (error instanceof GuestTagRepositoryError) return failure(error.message);
 
-    console.error(`[guest-tags] ${actionName} failed`, error);
+    logger.error(`[guest-tags] ${actionName} failed`, error);
     return failure(`Unable to ${actionName}. Please try again.`);
   }
 }

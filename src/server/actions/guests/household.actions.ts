@@ -10,6 +10,7 @@ import {
   PermissionDeniedError,
   requireRole,
 } from "../../auth/authorization";
+import { logger } from "../../logging/logger";
 import {
   HouseholdRepositoryError,
   householdRepository,
@@ -367,7 +368,7 @@ async function runHouseholdAction<T>(
       return failure(error.message);
     }
 
-    console.error(`[households] ${actionName} failed`, error);
+    logger.error(`[households] ${actionName} failed`, error);
     return failure(`Unable to ${actionName}. Please try again.`);
   }
 }

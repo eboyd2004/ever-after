@@ -10,6 +10,7 @@ import { AnimatedNumber } from "@/src/components/shared/animated-number";
 import { PageHeader } from "@/src/components/shared/page-header";
 import { Badge, Card, EmptyState } from "@/src/components/shared/ui";
 import { requireWedding } from "@/src/server/auth/get-active-wedding";
+import { logger } from "@/src/server/logging/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -84,7 +85,7 @@ async function loadDashboardData(): Promise<
       },
     };
   } catch (error) {
-    console.error("[dashboard] data load failed", error);
+    logger.error("[dashboard] data load failed", error);
 
     return { error: "Unable to load the dashboard right now." };
   }

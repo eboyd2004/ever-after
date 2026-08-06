@@ -7,6 +7,7 @@ import {
   AuthenticationRequiredError,
   getAuthenticatedUser,
 } from "@/src/server/auth/get-authenticated-user";
+import { logger } from "@/src/server/logging/logger";
 import {
   getInvitationReturnPath,
   getPublicWeddingInvitation,
@@ -31,7 +32,7 @@ export default async function InvitationAcceptancePage({
   try {
     invitation = await getPublicWeddingInvitation(token);
   } catch (error) {
-    console.error("[wedding-invitation] load public invitation failed", error);
+    logger.error("[wedding-invitation] load public invitation failed", error);
     return <InvitationState title="Invitation unavailable" message="We could not load this invitation right now. Please ask the wedding owner to send it again." />;
   }
 
@@ -43,7 +44,7 @@ export default async function InvitationAcceptancePage({
       }
     } catch (error) {
       if (!(error instanceof AuthenticationRequiredError)) {
-        console.error("[wedding-invitation] accepted invitation identity check failed", error);
+        logger.error("[wedding-invitation] accepted invitation identity check failed", error);
       }
     }
   }
@@ -58,7 +59,7 @@ export default async function InvitationAcceptancePage({
     authenticated = true;
   } catch (error) {
     if (!(error instanceof AuthenticationRequiredError)) {
-      console.error("[wedding-invitation] authenticated invitation check failed", error);
+      logger.error("[wedding-invitation] authenticated invitation check failed", error);
       return <InvitationState title="Account verification required" message="Finish verifying your Ever After account before accepting this invitation." />;
     }
   }
@@ -101,7 +102,7 @@ export default async function InvitationAcceptancePage({
   try {
     result = await weddingInvitationService.accept(token);
   } catch (error) {
-    console.error("[wedding-invitation] accept invitation failed", error);
+    logger.error("[wedding-invitation] accept invitation failed", error);
     return <InvitationState title="Invitation could not be accepted" message="Please try again or ask the wedding owner to resend the invitation." />;
   }
 

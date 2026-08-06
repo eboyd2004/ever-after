@@ -12,7 +12,11 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("[app] uncaught route error", error);
+    if (process.env.NODE_ENV === "production") {
+      console.error("[app] uncaught route error", error.digest);
+    } else {
+      console.error("[app] uncaught route error", error);
+    }
   }, [error]);
 
   return (

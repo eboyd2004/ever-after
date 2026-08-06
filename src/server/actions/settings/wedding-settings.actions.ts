@@ -13,6 +13,7 @@ import {
   PermissionDeniedError,
   requireRole,
 } from "../../auth/authorization";
+import { logger } from "../../logging/logger";
 import {
   weddingRepository,
   WeddingRepositoryError,
@@ -180,7 +181,7 @@ async function runSettingsAction<T>(
       return failure(error.message);
     }
 
-    console.error(`[wedding-settings] ${actionName} failed`, error);
+    logger.error(`[wedding-settings] ${actionName} failed`, error);
     return failure(`Unable to ${actionName}. Please try again.`);
   }
 }

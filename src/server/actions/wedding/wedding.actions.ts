@@ -8,6 +8,7 @@ import {
   getAuthenticatedUser,
 } from "../../auth/get-authenticated-user";
 import { PermissionDeniedError, requireOwner } from "../../auth/authorization";
+import { logger } from "../../logging/logger";
 import {
   weddingRepository,
   WeddingRepositoryError,
@@ -233,7 +234,7 @@ export async function createWedding(
         invitationId = invitation.invitationId;
         developmentInvitationUrl = invitation.developmentUrl;
       } catch (error) {
-        console.error("[wedding] create invitation after wedding creation failed", error);
+        logger.error("[wedding] create invitation after wedding creation failed", error);
         invitationMessage =
           "Your wedding was created, but the invitation could not be created. You can send it later from Settings.";
       }
@@ -261,7 +262,7 @@ export async function createWedding(
       return failure(error.message);
     }
 
-    console.error("[wedding] create wedding failed", error);
+    logger.error("[wedding] create wedding failed", error);
     return failure("Unable to create wedding. Please try again.");
   }
 }
@@ -315,7 +316,7 @@ export async function createWeddingInvitation(
     if (error instanceof WeddingInvitationServiceError) return failure(error.message);
     if (error instanceof WeddingRepositoryError) return failure(error.message);
 
-    console.error("[wedding] create invitation failed", error);
+    logger.error("[wedding] create invitation failed", error);
     return failure("Unable to create invitation. Please try again.");
   }
 }
@@ -344,7 +345,7 @@ export async function listWeddingInvitations(): Promise<
     if (error instanceof PermissionDeniedError) return failure(error.message);
     if (error instanceof WeddingInvitationServiceError) return failure(error.message);
 
-    console.error("[wedding] list invitations failed", error);
+    logger.error("[wedding] list invitations failed", error);
     return failure("Unable to load invitations. Please try again.");
   }
 }
@@ -376,7 +377,7 @@ export async function resendWeddingInvitation(
     if (error instanceof PermissionDeniedError) return failure(error.message);
     if (error instanceof WeddingInvitationServiceError) return failure(error.message);
 
-    console.error("[wedding] resend invitation failed", error);
+    logger.error("[wedding] resend invitation failed", error);
     return failure("Unable to resend invitation. Please try again.");
   }
 }
@@ -397,7 +398,7 @@ export async function revokeWeddingInvitation(
     if (error instanceof PermissionDeniedError) return failure(error.message);
     if (error instanceof WeddingInvitationServiceError) return failure(error.message);
 
-    console.error("[wedding] revoke invitation failed", error);
+    logger.error("[wedding] revoke invitation failed", error);
     return failure("Unable to revoke invitation. Please try again.");
   }
 }
@@ -435,14 +436,14 @@ export async function setActiveWedding(
       return failure(error.message);
     }
 
-    console.error("[wedding] set active wedding failed", error);
+    logger.error("[wedding] set active wedding failed", error);
     return failure("Unable to switch wedding. Please try again.");
   }
 }
 
 export async function deleteActiveWedding(
   confirmation: unknown,
-): Promise<WeddingActionResult<null>> {
+): Promise<WeddingActionResult<{ nextWeddingId: string | null }>> {
   if (typeof confirmation !== "string" || confirmation.trim().length === 0) {
     return failure("Type the wedding name to confirm deletion.");
   }
@@ -454,14 +455,17 @@ export async function deleteActiveWedding(
       return failure("The wedding name does not match.");
     }
 
-    await weddingRepository.deleteWedding(context.wedding.id);
+    const deletion = await weddingRepository.deleteWedding(
+      context.wedding.id,
+      context.user.id,
+    );
     revalidatePath("/", "layout");
     revalidatePath("/dashboard");
     revalidatePath("/checklist");
     revalidatePath("/settings");
     revalidatePath("/onboarding");
 
-    return { success: true, data: null };
+    return { success: true, data: deletion };
   } catch (error) {
     if (error instanceof AuthenticationRequiredError) {
       return failure("Authentication is required.");
@@ -479,7 +483,7 @@ export async function deleteActiveWedding(
       return failure(error.message);
     }
 
-    console.error("[wedding] delete wedding failed", error);
+    logger.error("[wedding] delete wedding failed", error);
     return failure("Unable to delete wedding. Please try again.");
   }
 }

@@ -1,3 +1,5 @@
+import "server-only";
+
 import { randomUUID } from "node:crypto";
 
 import {
@@ -5,6 +7,7 @@ import {
   Prisma,
 } from "../../../app/generated/prisma/client";
 import { prisma } from "../db/prisma";
+import { logger } from "../logging/logger";
 
 export type GuestFilters = {
   search?: string;
@@ -70,6 +73,21 @@ export class GuestRepositoryError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "GuestRepositoryError";
+  }
+}
+
+function isPrismaError(error: unknown, code: string) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === code
+  );
+}
+
+function throwPlusOneConflict(error: unknown): never | void {
+  if (isPrismaError(error, "P2002")) {
+    throw new GuestRepositoryError("This guest already has a plus-one.");
   }
 }
 
@@ -219,7 +237,7 @@ export class GuestRepository {
         orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
       });
     } catch (error) {
-      console.error("[guest-repository] list guests failed", error);
+      logger.error("[guest-repository] list guests failed", error);
       throw new GuestRepositoryError("Unable to load guests");
     }
   }
@@ -234,7 +252,7 @@ export class GuestRepository {
         orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
       });
     } catch (error) {
-      console.error(
+      logger.error(
         "[guest-repository] list standalone guests failed",
         error,
       );
@@ -260,7 +278,7 @@ export class GuestRepository {
       return guest;
     } catch (error) {
       if (error instanceof GuestRepositoryError) throw error;
-      console.error("[guest-repository] get guest failed", error);
+      logger.error("[guest-repository] get guest failed", error);
       throw new GuestRepositoryError("Unable to load guest");
     }
   }
@@ -275,7 +293,8 @@ export class GuestRepository {
       });
     } catch (error) {
       if (error instanceof GuestRepositoryError) throw error;
-      console.error("[guest-repository] create guest failed", error);
+      throwPlusOneConflict(error);
+      logger.error("[guest-repository] create guest failed", error);
       throw new GuestRepositoryError("Unable to create guest");
     }
   }
@@ -333,7 +352,8 @@ export class GuestRepository {
       return this.getGuest(weddingId, primaryId);
     } catch (error) {
       if (error instanceof GuestRepositoryError) throw error;
-      console.error(
+      throwPlusOneConflict(error);
+      logger.error(
         "[guest-repository] create guest with plus-one failed",
         error,
       );
@@ -383,7 +403,8 @@ export class GuestRepository {
       return this.getGuest(weddingId, guestId);
     } catch (error) {
       if (error instanceof GuestRepositoryError) throw error;
-      console.error("[guest-repository] add plus-one failed", error);
+      throwPlusOneConflict(error);
+      logger.error("[guest-repository] add plus-one failed", error);
       throw new GuestRepositoryError("Unable to add plus-one");
     }
   }
@@ -464,7 +485,8 @@ export class GuestRepository {
       return this.getGuest(weddingId, parent.id);
     } catch (error) {
       if (error instanceof GuestRepositoryError) throw error;
-      console.error(
+      throwPlusOneConflict(error);
+      logger.error(
         "[guest-repository] attach existing plus-one failed",
         error,
       );
@@ -511,7 +533,8 @@ export class GuestRepository {
       });
     } catch (error) {
       if (error instanceof GuestRepositoryError) throw error;
-      console.error("[guest-repository] update guest failed", error);
+      throwPlusOneConflict(error);
+      logger.error("[guest-repository] update guest failed", error);
       throw new GuestRepositoryError("Unable to update guest");
     }
   }
@@ -528,7 +551,7 @@ export class GuestRepository {
       ]);
     } catch (error) {
       if (error instanceof GuestRepositoryError) throw error;
-      console.error("[guest-repository] delete guest failed", error);
+      logger.error("[guest-repository] delete guest failed", error);
       throw new GuestRepositoryError("Unable to delete guest");
     }
   }
@@ -574,7 +597,7 @@ export class GuestRepository {
       return this.getGuest(weddingId, guestId);
     } catch (error) {
       if (error instanceof GuestRepositoryError) throw error;
-      console.error("[guest-repository] assign guest to household failed", error);
+      logger.error("[guest-repository] assign guest to household failed", error);
       throw new GuestRepositoryError("Unable to assign guest to household");
     }
   }
@@ -595,7 +618,7 @@ export class GuestRepository {
       return this.getGuest(weddingId, guestId);
     } catch (error) {
       if (error instanceof GuestRepositoryError) throw error;
-      console.error("[guest-repository] remove guest from household failed", error);
+      logger.error("[guest-repository] remove guest from household failed", error);
       throw new GuestRepositoryError("Unable to remove guest from household");
     }
   }
@@ -611,7 +634,7 @@ export class GuestRepository {
       });
     } catch (error) {
       if (error instanceof GuestRepositoryError) throw error;
-      console.error(
+      logger.error(
         "[guest-repository] remove plus-one relationship failed",
         error,
       );
@@ -643,7 +666,7 @@ export class GuestRepository {
       return this.getGuest(weddingId, guestId);
     } catch (error) {
       if (error instanceof GuestRepositoryError) throw error;
-      console.error("[guest-repository] set guest tags failed", error);
+      logger.error("[guest-repository] set guest tags failed", error);
       throw new GuestRepositoryError("Unable to update guest tags");
     }
   }

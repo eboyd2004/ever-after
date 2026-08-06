@@ -12,9 +12,11 @@ import {
 } from "./email/invitation-email.service";
 import {
   weddingInvitationRepository,
+  WeddingInvitationAcceptanceError,
   WeddingInvitationRepositoryError,
 } from "../repositories/wedding-invitation.repository";
 import { getAuthenticatedUser } from "../auth/get-authenticated-user";
+import { logger } from "../logging/logger";
 
 export const WEDDING_INVITATION_EXPIRY_DAYS = 7;
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,128}$/;
@@ -224,7 +226,7 @@ export class WeddingInvitationService {
     } catch (error) {
       if (!(error instanceof WeddingInvitationEmailError)) throw error;
 
-      console.error("[wedding-invitation] email delivery failed", error);
+      logger.error("[wedding-invitation] email delivery failed", error);
       return {
         invitationId: invitation.id,
         emailSent: false,
@@ -291,9 +293,6 @@ export class WeddingInvitationService {
     const invitation = await weddingInvitationRepository.findByTokenHash(hashToken(rawToken));
 
     if (!invitation) return { ok: false as const, code: "INVALID" as const };
-    if (invitation.status === WeddingInvitationStatus.ACCEPTED) {
-      return { ok: false as const, code: "ACCEPTED" as const };
-    }
     if (invitation.status === WeddingInvitationStatus.REVOKED) {
       return { ok: false as const, code: "REVOKED" as const };
     }
@@ -316,12 +315,40 @@ export class WeddingInvitationService {
       };
     }
 
-    const acceptance = await weddingInvitationRepository.accept({
-      id: invitation.id,
-      weddingId: invitation.weddingId,
-      userId: user.id,
-      role: invitation.role,
-    });
+    if (invitation.status === WeddingInvitationStatus.ACCEPTED) {
+      if (invitation.acceptedBy?.id === user.id) {
+        return {
+          ok: true as const,
+          weddingId: invitation.weddingId,
+          alreadyMember: true,
+        };
+      }
+
+      return { ok: false as const, code: "ACCEPTED" as const };
+    }
+
+    let acceptance;
+    try {
+      acceptance = await weddingInvitationRepository.accept({
+        id: invitation.id,
+        weddingId: invitation.weddingId,
+        userId: user.id,
+      });
+    } catch (error) {
+      if (error instanceof WeddingInvitationAcceptanceError) {
+        if (error.code === "EMAIL_MISMATCH") {
+          return {
+            ok: false as const,
+            code: "EMAIL_MISMATCH" as const,
+            maskedEmail: maskEmail(expectedEmail),
+          };
+        }
+
+        return { ok: false as const, code: "INVALID" as const };
+      }
+
+      throw error;
+    }
 
     return {
       ok: true as const,

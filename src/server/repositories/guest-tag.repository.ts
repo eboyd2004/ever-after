@@ -1,4 +1,7 @@
+import "server-only";
+
 import { prisma } from "../db/prisma";
+import { logger } from "../logging/logger";
 
 export type GuestTagInput = {
   name: string;
@@ -25,7 +28,7 @@ export class GuestTagRepository {
       }
     } catch (error) {
       if (error instanceof GuestTagRepositoryError) throw error;
-      console.error("[guest-tag-repository] validate tags failed", error);
+      logger.error("[guest-tag-repository] validate tags failed", error);
       throw new GuestTagRepositoryError("Unable to validate guest tags");
     }
   }
@@ -38,7 +41,7 @@ export class GuestTagRepository {
         include: { _count: { select: { assignments: true } } },
       });
     } catch (error) {
-      console.error("[guest-tag-repository] list tags failed", error);
+      logger.error("[guest-tag-repository] list tags failed", error);
       throw new GuestTagRepositoryError("Unable to load guest tags");
     }
   }
@@ -49,7 +52,7 @@ export class GuestTagRepository {
         data: { weddingId, ...input },
       });
     } catch (error) {
-      console.error("[guest-tag-repository] create tag failed", error);
+      logger.error("[guest-tag-repository] create tag failed", error);
       throw new GuestTagRepositoryError(
         "Unable to create guest tag. A tag with this name may already exist.",
       );
@@ -71,7 +74,7 @@ export class GuestTagRepository {
       });
     } catch (error) {
       if (error instanceof GuestTagRepositoryError) throw error;
-      console.error("[guest-tag-repository] update tag failed", error);
+      logger.error("[guest-tag-repository] update tag failed", error);
       throw new GuestTagRepositoryError(
         "Unable to update guest tag. A tag with this name may already exist.",
       );
@@ -89,7 +92,7 @@ export class GuestTagRepository {
       await prisma.guestTag.delete({ where: { id: tagId } });
     } catch (error) {
       if (error instanceof GuestTagRepositoryError) throw error;
-      console.error("[guest-tag-repository] delete tag failed", error);
+      logger.error("[guest-tag-repository] delete tag failed", error);
       throw new GuestTagRepositoryError("Unable to delete guest tag");
     }
   }
@@ -115,7 +118,7 @@ export class GuestTagRepository {
       });
     } catch (error) {
       if (error instanceof GuestTagRepositoryError) throw error;
-      console.error("[guest-tag-repository] assign tag failed", error);
+      logger.error("[guest-tag-repository] assign tag failed", error);
       throw new GuestTagRepositoryError("Unable to assign guest tag");
     }
   }
@@ -134,7 +137,7 @@ export class GuestTagRepository {
       });
     } catch (error) {
       if (error instanceof GuestTagRepositoryError) throw error;
-      console.error("[guest-tag-repository] remove tag failed", error);
+      logger.error("[guest-tag-repository] remove tag failed", error);
       throw new GuestTagRepositoryError("Unable to remove guest tag");
     }
   }

@@ -1,8 +1,11 @@
+import "server-only";
+
 import {
   MembershipStatus,
   WeddingMemberRole,
 } from "../../../app/generated/prisma/client";
 import { prisma } from "../db/prisma";
+import { logger } from "../logging/logger";
 
 export type CreateWeddingRepositoryInput = {
   userId: string;
@@ -61,7 +64,7 @@ export class WeddingRepository {
       return wedding;
     } catch (error) {
       if (error instanceof WeddingRepositoryError) throw error;
-      console.error("[wedding-repository] load general settings failed", error);
+      logger.error("[wedding-repository] load general settings failed", error);
       throw new WeddingRepositoryError("Unable to load wedding settings");
     }
   }
@@ -87,7 +90,7 @@ export class WeddingRepository {
         },
       });
     } catch (error) {
-      console.error("[wedding-repository] update general settings failed", error);
+      logger.error("[wedding-repository] update general settings failed", error);
       throw new WeddingRepositoryError("Unable to save wedding settings");
     }
   }
@@ -107,7 +110,7 @@ export class WeddingRepository {
       return wedding;
     } catch (error) {
       if (error instanceof WeddingRepositoryError) throw error;
-      console.error("[wedding-repository] load wedding locations failed", error);
+      logger.error("[wedding-repository] load wedding locations failed", error);
       throw new WeddingRepositoryError("Unable to load wedding locations");
     }
   }
@@ -127,7 +130,7 @@ export class WeddingRepository {
         },
       });
     } catch (error) {
-      console.error("[wedding-repository] update wedding locations failed", error);
+      logger.error("[wedding-repository] update wedding locations failed", error);
       throw new WeddingRepositoryError("Unable to save wedding locations");
     }
   }
@@ -159,7 +162,7 @@ export class WeddingRepository {
         include: { members: true },
       });
     } catch (error) {
-      console.error("[wedding-repository] create wedding failed", error);
+      logger.error("[wedding-repository] create wedding failed", error);
       throw new WeddingRepositoryError("Unable to create wedding");
     }
   }
@@ -179,7 +182,7 @@ export class WeddingRepository {
         ? membership
         : null;
     } catch (error) {
-      console.error("[wedding-repository] load membership failed", error);
+      logger.error("[wedding-repository] load membership failed", error);
       throw new WeddingRepositoryError("Unable to verify wedding membership");
     }
   }
@@ -199,26 +202,58 @@ export class WeddingRepository {
         update: { activeWeddingId: weddingId },
       });
     } catch (error) {
-      console.error("[wedding-repository] set active wedding failed", error);
+      logger.error("[wedding-repository] set active wedding failed", error);
       throw new WeddingRepositoryError("Unable to save active wedding");
     }
   }
 
-  async deleteWedding(weddingId: string) {
+  async deleteWedding(weddingId: string, userId: string) {
     try {
-      // Delete dependent checklist records explicitly so the category/task
-      // restriction cannot block deletion of the wedding. Task links and
-      // recurrence rows cascade from their tasks.
-      await prisma.userPreference.updateMany({
-        where: { activeWeddingId: weddingId },
-        data: { activeWeddingId: null },
+      return await prisma.$transaction(async (tx) => {
+        // Clear preferences before deleting the Wedding. Invitations, guests,
+        // households, tags, and sections are removed by their declared
+        // database cascades when the Wedding is deleted.
+        await tx.userPreference.updateMany({
+          where: { activeWeddingId: weddingId },
+          data: { activeWeddingId: null },
+        });
+
+        // Delete dependent checklist records explicitly so the category/task
+        // restriction cannot block deletion of the Wedding. Task links and
+        // recurrence rows cascade from their tasks.
+        await tx.task.deleteMany({ where: { weddingId } });
+        await tx.taskCategory.deleteMany({ where: { weddingId } });
+        await tx.weddingMember.deleteMany({ where: { weddingId } });
+        await tx.wedding.delete({ where: { id: weddingId } });
+
+        const nextMembership = await tx.weddingMember.findFirst({
+          where: {
+            userId,
+            status: MembershipStatus.ACTIVE,
+          },
+          select: { weddingId: true },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        });
+
+        if (nextMembership) {
+          await tx.userPreference.upsert({
+            where: { userId },
+            create: {
+              userId,
+              activeWeddingId: nextMembership.weddingId,
+              theme: "light",
+              emailNotificationsEnabled: true,
+              taskNotificationsEnabled: true,
+              paymentNotificationsEnabled: true,
+            },
+            update: { activeWeddingId: nextMembership.weddingId },
+          });
+        }
+
+        return { nextWeddingId: nextMembership?.weddingId ?? null };
       });
-      await prisma.task.deleteMany({ where: { weddingId } });
-      await prisma.taskCategory.deleteMany({ where: { weddingId } });
-      await prisma.weddingMember.deleteMany({ where: { weddingId } });
-      await prisma.wedding.delete({ where: { id: weddingId } });
     } catch (error) {
-      console.error("[wedding-repository] delete wedding failed", error);
+      logger.error("[wedding-repository] delete wedding failed", error);
       throw new WeddingRepositoryError("Unable to delete wedding");
     }
   }

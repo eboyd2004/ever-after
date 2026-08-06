@@ -10,6 +10,7 @@ import {
   PermissionDeniedError,
   requireRole,
 } from "../../auth/authorization";
+import { logger } from "../../logging/logger";
 import {
   ChecklistRepositoryError,
   checklistRepository,
@@ -752,7 +753,7 @@ async function runAction<T>(
       return failure(error.message);
     }
 
-    console.error(`[checklist] ${actionName} failed`, error);
+    logger.error(`[checklist] ${actionName} failed`, error);
     return failure(`Unable to ${actionName}. Please try again.`);
   }
 }
