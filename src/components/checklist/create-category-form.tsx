@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import type { FormEvent } from "react";
 
+import { categoryColourOptions, categoryIconOptions } from "./category-options";
 import type { CreateCategoryAction } from "./types";
 
 type CreateCategoryFormProps = {
@@ -103,26 +104,34 @@ export function CreateCategoryForm({
 
         <label>
           <span className="mb-1 block text-xs font-medium text-[#6B6B63]">Icon</span>
-          <input
+          <select
             name="icon"
-            type="text"
-            maxLength={100}
-            placeholder="Optional"
             defaultValue={initialValues?.icon ?? ""}
             className="w-full rounded-[10px] border border-[#E8E8E3] px-3 py-2 text-sm outline-none transition focus:border-[#2D5A27] focus:ring-2 focus:ring-[#EAF0E8]"
-          />
+          >
+            <option value="">No icon</option>
+            {categoryIconOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </label>
 
         <label className="sm:col-span-2">
           <span className="mb-1 block text-xs font-medium text-[#6B6B63]">Colour</span>
-          <input
+          <select
             name="colour"
-            type="text"
-            maxLength={50}
-            placeholder="Optional, e.g. rose"
             defaultValue={initialValues?.colour ?? ""}
             className="w-full rounded-[10px] border border-[#E8E8E3] px-3 py-2 text-sm outline-none transition focus:border-[#2D5A27] focus:ring-2 focus:ring-[#EAF0E8]"
-          />
+          >
+            <option value="">No colour</option>
+            {categoryColourOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </label>
       </div>
 

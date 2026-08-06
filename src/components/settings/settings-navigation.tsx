@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "@/src/components/shared/icons";
 
 export const settingsNavigationItems = [
+  { href: "/settings", label: "Overview", icon: "dashboard" },
   { href: "/settings/general", label: "General", icon: "settings" },
   { href: "/settings/locations", label: "Locations", icon: "pin" },
   { href: "/settings/members", label: "Members", icon: "users" },
@@ -20,7 +21,9 @@ export function SettingsNavigation() {
     <nav aria-label="Settings navigation" className="overflow-x-auto">
       <div className="flex min-w-max gap-1.5 rounded-[14px] border border-[#E8E8E3] bg-white p-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.03)] sm:inline-flex">
         {settingsNavigationItems.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const active =
+            pathname === item.href ||
+            (item.href !== "/settings" && pathname.startsWith(`${item.href}/`));
 
           return (
             <Link

@@ -54,19 +54,42 @@ function createRawToken() {
 }
 
 function getInvitationUrl(token: string) {
-  const configuredAppUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  const configuredAppUrl = process.env.APP_URL?.trim();
+  const isProduction = process.env.NODE_ENV === "production";
 
-  if (!configuredAppUrl && process.env.NODE_ENV === "production") {
+  if (!configuredAppUrl && isProduction) {
     throw new WeddingInvitationServiceError(
-      "NEXT_PUBLIC_APP_URL must be configured before sending invitations.",
+      "APP_URL must be configured before sending invitations in production.",
     );
   }
 
   const appUrl = configuredAppUrl || "http://localhost:3000";
-  return new URL(
-    `/invitations/accept?token=${encodeURIComponent(token)}`,
-    appUrl,
-  ).toString();
+
+  try {
+    const parsedAppUrl = new URL(appUrl);
+
+    if (
+      isProduction &&
+      ["localhost", "127.0.0.1", "::1"].includes(parsedAppUrl.hostname)
+    ) {
+      throw new WeddingInvitationServiceError(
+        "APP_URL must point to the deployed application in production.",
+      );
+    }
+
+    return new URL(
+      `/invitations/accept?token=${encodeURIComponent(token)}`,
+      parsedAppUrl,
+    ).toString();
+  } catch (error) {
+    if (error instanceof WeddingInvitationServiceError) {
+      throw error;
+    }
+
+    throw new WeddingInvitationServiceError(
+      "APP_URL must be a valid application URL.",
+    );
+  }
 }
 
 function maskEmail(email: string) {
