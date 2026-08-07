@@ -1,5 +1,6 @@
 import "server-only";
 
+import { TaskStatus } from "../../../app/generated/prisma/client";
 import { prisma } from "../db/prisma";
 import { logger } from "../logging/logger";
 
@@ -8,14 +9,16 @@ export type DashboardTask = {
   title: string;
   status: string;
   priority: string;
-  dueDate: Date | null;
+  dueDate: Date;
 };
 
 export type DashboardSummary = {
   guestCount: number;
   unassignedGuestCount: number;
   householdCount: number;
-  tasks: DashboardTask[];
+  taskCount: number;
+  completedTaskCount: number;
+  upcomingTasks: DashboardTask[];
 };
 
 export class DashboardRepositoryError extends Error {
@@ -28,7 +31,12 @@ export class DashboardRepositoryError extends Error {
 export class DashboardRepository {
   async getDashboardSummary(weddingId: string): Promise<DashboardSummary> {
     try {
-      const [guestCounts, householdCount, tasks] = await Promise.all([
+      const [
+        guestCounts,
+        householdCount,
+        taskCounts,
+        upcomingTaskRecords,
+      ] = await Promise.all([
         prisma.guest.groupBy({
           by: ["householdId"],
           where: { weddingId },
@@ -37,8 +45,19 @@ export class DashboardRepository {
         prisma.household.count({
           where: { weddingId },
         }),
-        prisma.task.findMany({
+        prisma.task.groupBy({
+          by: ["status"],
           where: { weddingId },
+          _count: { _all: true },
+        }),
+        prisma.task.findMany({
+          where: {
+            weddingId,
+            status: {
+              notIn: [TaskStatus.COMPLETED, TaskStatus.CANCELLED],
+            },
+            dueDate: { not: null },
+          },
           select: {
             id: true,
             title: true,
@@ -47,11 +66,13 @@ export class DashboardRepository {
             dueDate: true,
           },
           orderBy: [
+            { dueDate: "asc" },
             { category: { position: "asc" } },
             { category: { createdAt: "asc" } },
             { position: "asc" },
             { createdAt: "asc" },
           ],
+          take: 5,
         }),
       ]);
 
@@ -61,12 +82,24 @@ export class DashboardRepository {
       );
       const unassignedGuestCount =
         guestCounts.find((group) => group.householdId === null)?._count._all ?? 0;
+      const taskCount = taskCounts.reduce(
+        (total, group) => total + group._count._all,
+        0,
+      );
+      const completedTaskCount =
+        taskCounts.find((group) => group.status === TaskStatus.COMPLETED)?._count
+          ._all ?? 0;
+      const upcomingTasks = upcomingTaskRecords.filter(
+        (task): task is typeof task & { dueDate: Date } => task.dueDate !== null,
+      );
 
       return {
         guestCount,
         unassignedGuestCount,
         householdCount,
-        tasks,
+        taskCount,
+        completedTaskCount,
+        upcomingTasks,
       };
     } catch (error) {
       logger.error("[dashboard-repository] load summary failed", error);

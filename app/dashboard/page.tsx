@@ -24,7 +24,9 @@ type DashboardData = {
   guestCount: number;
   householdCount: number;
   unassignedGuestCount: number;
-  tasks: DashboardTask[];
+  taskCount: number;
+  completedTaskCount: number;
+  upcomingTasks: DashboardTask[];
 };
 
 async function loadDashboardData(): Promise<
@@ -53,7 +55,9 @@ async function loadDashboardData(): Promise<
         guestCount: summary.guestCount,
         householdCount: summary.householdCount,
         unassignedGuestCount: summary.unassignedGuestCount,
-        tasks: summary.tasks,
+        taskCount: summary.taskCount,
+        completedTaskCount: summary.completedTaskCount,
+        upcomingTasks: summary.upcomingTasks,
       },
     };
   } catch (error) {
@@ -87,29 +91,17 @@ export default async function DashboardPage() {
     householdCount,
     unassignedGuestCount,
     partnerNames,
-    tasks,
+    taskCount,
+    completedTaskCount,
+    upcomingTasks,
     timezone,
     userFirstName,
     weddingDate,
     weddingName,
   } = loaded.data;
-  const completedCount = tasks.filter((task) => task.status === "COMPLETED").length;
-  const activeTasks = tasks.filter(
-    (task) => task.status !== "COMPLETED" && task.status !== "CANCELLED",
-  );
-  const upcomingTasks = activeTasks
-    .filter(
-      (task): task is DashboardTask & { dueDate: Date } =>
-        task.dueDate !== null,
-    )
-    .sort(
-      (first, second) =>
-        new Date(first.dueDate ?? 0).getTime() -
-        new Date(second.dueDate ?? 0).getTime(),
-    )
-    .slice(0, 5);
-  const completionPercentage = tasks.length
-    ? Math.round((completedCount / tasks.length) * 100)
+  const completedCount = completedTaskCount;
+  const completionPercentage = taskCount
+    ? Math.round((completedCount / taskCount) * 100)
     : 0;
   const daysToWedding = Math.max(0, getDaysToWedding(weddingDate));
 
@@ -155,7 +147,7 @@ export default async function DashboardPage() {
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <MetricCard
-          description={`${completedCount} of ${tasks.length} tasks done`}
+          description={`${completedCount} of ${taskCount} tasks done`}
           icon="checklist"
           label="Planning progress"
           suffix="%"
@@ -272,7 +264,7 @@ export default async function DashboardPage() {
             <AnimatedNumber suffix="%" value={completionPercentage} />
           </p>
           <p className="mt-1 text-sm text-[#7A7A6E]">
-            <AnimatedNumber value={completedCount} /> of <AnimatedNumber value={tasks.length} /> tasks
+            <AnimatedNumber value={completedCount} /> of <AnimatedNumber value={taskCount} /> tasks
             completed
           </p>
           <div className="mt-5 h-2 overflow-hidden rounded-full bg-[#F4F4F1]">
