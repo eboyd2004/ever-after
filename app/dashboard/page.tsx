@@ -7,6 +7,7 @@ import { PageHeader } from "@/src/components/shared/page-header";
 import { Badge, Card, EmptyState } from "@/src/components/shared/ui";
 import { requireWedding } from "@/src/server/auth/get-active-wedding";
 import { logger } from "@/src/server/logging/logger";
+import { measurePerformance } from "@/src/server/logging/performance";
 import {
   dashboardRepository,
   type DashboardTask,
@@ -67,7 +68,7 @@ async function loadDashboardData(): Promise<
   }
 }
 
-export default async function DashboardPage() {
+async function renderDashboardPage() {
   const loaded = await loadDashboardData();
 
   if ("error" in loaded) {
@@ -274,6 +275,10 @@ export default async function DashboardPage() {
       </section>
     </div>
   );
+}
+
+export default async function DashboardPage() {
+  return measurePerformance("dashboard.page.total", renderDashboardPage);
 }
 
 function HeroMetric({

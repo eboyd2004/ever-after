@@ -5,6 +5,7 @@ import { cache } from "react";
 
 import type { User } from "../../../app/generated/prisma/client";
 import { prisma } from "../db/prisma";
+import { measurePerformance } from "../logging/performance";
 
 export class AuthenticationRequiredError extends Error {
   constructor() {
@@ -220,45 +221,55 @@ async function createUserOrRecoverFromRace(
  * move to verified Clerk webhooks.
  */
 const resolveAuthenticatedUser = cache(
-  async (): Promise<AuthenticatedUser> => {
-    const { userId } = await auth();
+  async (): Promise<AuthenticatedUser> =>
+    measurePerformance("auth.total", async () => {
+      const { clerkUser } = await measurePerformance(
+        "auth.clerk",
+        async () => {
+          const { userId } = await auth();
 
-    if (!userId) {
-      throw new AuthenticationRequiredError();
-    }
-
-    const clerkUser = await currentUser();
-
-    if (!clerkUser || clerkUser.id !== userId) {
-      throw new AuthenticationRequiredError();
-    }
-
-    const existingUser = await prisma.user.findUnique({
-      where: { authProviderId: clerkUser.id },
-    });
-    const profile = getClerkProfile(clerkUser);
-
-    const user = existingUser
-      ? await synchronizeExistingUser(existingUser, profile)
-      : await (async () => {
-          const existingEmailOwner = await prisma.user.findUnique({
-            where: { email: profile.email },
-            select: { id: true, authProviderId: true },
-          });
-
-          if (existingEmailOwner) {
-            return associateExistingEmailUser(
-              existingEmailOwner,
-              clerkUser.id,
-              profile,
-            );
+          if (!userId) {
+            throw new AuthenticationRequiredError();
           }
 
-          return createUserOrRecoverFromRace(clerkUser.id, profile);
-        })();
+          const clerkUser = await currentUser();
 
-    return { clerkUserId: clerkUser.id, user };
-  },
+          if (!clerkUser || clerkUser.id !== userId) {
+            throw new AuthenticationRequiredError();
+          }
+
+          return { clerkUser };
+        },
+      );
+
+      const user = await measurePerformance("auth.localUser", async () => {
+        const existingUser = await prisma.user.findUnique({
+          where: { authProviderId: clerkUser.id },
+        });
+        const profile = getClerkProfile(clerkUser);
+
+        return existingUser
+          ? synchronizeExistingUser(existingUser, profile)
+          : (async () => {
+              const existingEmailOwner = await prisma.user.findUnique({
+                where: { email: profile.email },
+                select: { id: true, authProviderId: true },
+              });
+
+              if (existingEmailOwner) {
+                return associateExistingEmailUser(
+                  existingEmailOwner,
+                  clerkUser.id,
+                  profile,
+                );
+              }
+
+              return createUserOrRecoverFromRace(clerkUser.id, profile);
+            })();
+      });
+
+      return { clerkUserId: clerkUser.id, user };
+    }),
 );
 
 export function getAuthenticatedUser(): Promise<AuthenticatedUser> {
