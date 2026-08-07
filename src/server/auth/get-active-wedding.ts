@@ -1,6 +1,7 @@
 import "server-only";
 
 import { redirect } from "next/navigation";
+import { cache } from "react";
 
 import {
   MembershipStatus,
@@ -45,58 +46,66 @@ export class ActiveWeddingRequiredError extends Error {
  * The selected wedding is persisted in UserPreference and is always checked
  * against the user's current memberships before it is used.
  */
+const resolveActiveWedding = cache(
+  async (): Promise<ActiveWeddingContext | null> => {
+    const authenticatedUser = await getAuthenticatedUser();
+    const memberships = await prisma.weddingMember.findMany({
+      where: {
+        userId: authenticatedUser.user.id,
+        status: MembershipStatus.ACTIVE,
+      },
+      include: { wedding: true },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    });
+
+    if (memberships.length === 0) {
+      return null;
+    }
+
+    const preference = await prisma.userPreference.findUnique({
+      where: { userId: authenticatedUser.user.id },
+      select: { activeWeddingId: true },
+    });
+
+    const selectedMembership =
+      memberships.find(
+        (membership) => membership.weddingId === preference?.activeWeddingId,
+      ) ?? memberships[0];
+
+    if (preference?.activeWeddingId !== selectedMembership.weddingId) {
+      await weddingRepository.setActiveWedding(
+        authenticatedUser.user.id,
+        selectedMembership.weddingId,
+      );
+    }
+
+    return {
+      user: authenticatedUser.user,
+      wedding: selectedMembership.wedding,
+      membership: selectedMembership,
+      role: selectedMembership.role,
+      availableWeddings: memberships.map(({ wedding }) => ({
+        id: wedding.id,
+        name: wedding.name,
+        partnerOneName: wedding.partnerOneName,
+        partnerTwoName: wedding.partnerTwoName,
+        weddingDate: wedding.weddingDate,
+        timezone: wedding.timezone,
+      })),
+    };
+  },
+);
+
 export async function getActiveWedding(options?: {
   redirectToOnboarding?: boolean;
 }): Promise<ActiveWeddingContext | null> {
-  const authenticatedUser = await getAuthenticatedUser();
-  const memberships = await prisma.weddingMember.findMany({
-    where: {
-      userId: authenticatedUser.user.id,
-      status: MembershipStatus.ACTIVE,
-    },
-    include: { wedding: true },
-    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-  });
+  const context = await resolveActiveWedding();
 
-  if (memberships.length === 0) {
-    if (options?.redirectToOnboarding) {
-      redirect("/onboarding");
-    }
-
-    return null;
+  if (!context && options?.redirectToOnboarding) {
+    redirect("/onboarding");
   }
 
-  const preference = await prisma.userPreference.findUnique({
-    where: { userId: authenticatedUser.user.id },
-    select: { activeWeddingId: true },
-  });
-
-  const selectedMembership =
-    memberships.find(
-      (membership) => membership.weddingId === preference?.activeWeddingId,
-    ) ?? memberships[0];
-
-  if (preference?.activeWeddingId !== selectedMembership.weddingId) {
-    await weddingRepository.setActiveWedding(
-      authenticatedUser.user.id,
-      selectedMembership.weddingId,
-    );
-  }
-
-  return {
-    user: authenticatedUser.user,
-    wedding: selectedMembership.wedding,
-    membership: selectedMembership,
-    role: selectedMembership.role,
-    availableWeddings: memberships.map(({ wedding }) => ({
-      id: wedding.id,
-      name: wedding.name,
-      partnerOneName: wedding.partnerOneName,
-      partnerTwoName: wedding.partnerTwoName,
-      weddingDate: wedding.weddingDate,
-      timezone: wedding.timezone,
-    })),
-  };
+  return context;
 }
 
 export async function requireWedding(): Promise<ActiveWeddingContext> {

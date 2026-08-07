@@ -45,18 +45,6 @@ function formatCountdown(date: Date) {
 }
 
 async function getShellContext(): Promise<AppShellContext | null> {
-  let authenticatedUser;
-
-  try {
-    authenticatedUser = await getAuthenticatedUser();
-  } catch (error) {
-    if (!(error instanceof AuthenticationRequiredError)) {
-      logger.error("[layout] authenticated user load failed", error);
-    }
-
-    return null;
-  }
-
   let activeWeddingContext: Awaited<ReturnType<typeof getActiveWedding>> = null;
 
   try {
@@ -64,7 +52,26 @@ async function getShellContext(): Promise<AppShellContext | null> {
       redirectToOnboarding: false,
     });
   } catch (error) {
+    if (error instanceof AuthenticationRequiredError) {
+      return null;
+    }
+
     logger.error("[layout] active wedding context load failed", error);
+  }
+
+  let authenticatedUser: Awaited<ReturnType<typeof getAuthenticatedUser>> | null =
+    null;
+
+  if (!activeWeddingContext) {
+    try {
+      authenticatedUser = await getAuthenticatedUser();
+    } catch (error) {
+      if (!(error instanceof AuthenticationRequiredError)) {
+        logger.error("[layout] authenticated user load failed", error);
+      }
+
+      return null;
+    }
   }
 
   let wedding: AppShellContext["wedding"] = null;
@@ -82,7 +89,12 @@ async function getShellContext(): Promise<AppShellContext | null> {
     };
   }
 
-  const { user } = activeWeddingContext ?? authenticatedUser;
+  const user = activeWeddingContext?.user ?? authenticatedUser?.user;
+
+  if (!user) {
+    return null;
+  }
+
   const fallbackName = user.email;
 
   return {
