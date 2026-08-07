@@ -1,16 +1,16 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { getCategories, getTasks } from "@/src/server/actions/checklist/checklist.actions";
-import type { TaskActionData } from "@/src/server/actions/checklist/checklist.actions";
-import { getGuests } from "@/src/server/actions/guests/guest.actions";
-import { getHouseholds } from "@/src/server/actions/guests/household.actions";
 import { Icon, type IconName } from "@/src/components/shared/icons";
 import { AnimatedNumber } from "@/src/components/shared/animated-number";
 import { PageHeader } from "@/src/components/shared/page-header";
 import { Badge, Card, EmptyState } from "@/src/components/shared/ui";
 import { requireWedding } from "@/src/server/auth/get-active-wedding";
 import { logger } from "@/src/server/logging/logger";
+import {
+  dashboardRepository,
+  type DashboardTask,
+} from "@/src/server/repositories/dashboard.repository";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,7 @@ type DashboardData = {
   guestCount: number;
   householdCount: number;
   unassignedGuestCount: number;
-  tasks: TaskActionData[];
+  tasks: DashboardTask[];
 };
 
 async function loadDashboardData(): Promise<
@@ -33,35 +33,9 @@ async function loadDashboardData(): Promise<
   const context = await requireWedding();
 
   try {
-    const guestsResult = await getGuests();
-    if (!guestsResult.success) {
-      return { error: guestsResult.error };
-    }
-
-    const householdsResult = await getHouseholds();
-    if (!householdsResult.success) {
-      return { error: householdsResult.error };
-    }
-
-    const categoriesResult = await getCategories();
-
-    if (!categoriesResult.success) {
-      return { error: categoriesResult.error };
-    }
-
-    const tasks: TaskActionData[] = [];
-
-    // Keep these reads sequential. The local Prisma Postgres adapter can close
-    // connections when several nested Server Action reads start at once.
-    for (const category of categoriesResult.data) {
-      const result = await getTasks(category.id);
-
-      if (!result.success) {
-        return { error: result.error };
-      }
-
-      tasks.push(...result.data);
-    }
+    const summary = await dashboardRepository.getDashboardSummary(
+      context.wedding.id,
+    );
 
     const { ceremonyLocation, receptionLocation } = context.wedding;
     const locationSummary = [ceremonyLocation, receptionLocation]
@@ -76,12 +50,10 @@ async function loadDashboardData(): Promise<
         weddingDate: context.wedding.weddingDate,
         timezone: context.wedding.timezone,
         locationSummary: locationSummary || null,
-        guestCount: guestsResult.data.length,
-        householdCount: householdsResult.data.length,
-        unassignedGuestCount: guestsResult.data.filter(
-          (guest) => guest.householdId === null,
-        ).length,
-        tasks,
+        guestCount: summary.guestCount,
+        householdCount: summary.householdCount,
+        unassignedGuestCount: summary.unassignedGuestCount,
+        tasks: summary.tasks,
       },
     };
   } catch (error) {
@@ -126,7 +98,10 @@ export default async function DashboardPage() {
     (task) => task.status !== "COMPLETED" && task.status !== "CANCELLED",
   );
   const upcomingTasks = activeTasks
-    .filter((task) => task.dueDate)
+    .filter(
+      (task): task is DashboardTask & { dueDate: Date } =>
+        task.dueDate !== null,
+    )
     .sort(
       (first, second) =>
         new Date(first.dueDate ?? 0).getTime() -
@@ -235,7 +210,7 @@ export default async function DashboardPage() {
                       {task.title}
                     </span>
                     <span className="mt-0.5 block text-xs text-[#8A8A82]">
-                      Due {formatDate(new Date(task.dueDate as string), timezone)}
+                      Due {formatDate(task.dueDate, timezone)}
                     </span>
                   </span>
                   <Badge tone={task.priority === "URGENT" || task.priority === "HIGH" ? "danger" : "warning"}>
