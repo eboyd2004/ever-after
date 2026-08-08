@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import type { HouseholdData } from "@/src/server/actions/guests/household.actions";
+import type { GuestListTag } from "@/src/server/repositories/guest-list.repository";
 import { Button } from "@/src/components/shared/ui";
 import { Icon } from "@/src/components/shared/icons";
 import { GuestCreationModal } from "./guest-creation-modal";
@@ -14,7 +15,7 @@ export function GuestCreationTrigger({
   lockedHouseholdId,
 }: {
   households: Pick<HouseholdData, "id" | "name">[];
-  tags: { id: string; name: string; colour: string | null }[];
+  tags: GuestListTag[];
   buttonLabel?: string;
   lockedHouseholdId?: string;
 }) {

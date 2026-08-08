@@ -1,7 +1,9 @@
 import Link from "next/link";
 
-import type { GuestTagActionData } from "@/src/server/actions/guests/guest.actions";
-import type { HouseholdData } from "@/src/server/actions/guests/household.actions";
+import type {
+  GuestListHousehold,
+  GuestListTag,
+} from "@/src/server/repositories/guest-list.repository";
 import { Button, Input, Select } from "@/src/components/shared/ui";
 
 export function GuestFilters({
@@ -18,8 +20,8 @@ export function GuestFilters({
   ageGroup?: string;
   tagId?: string;
   unassignedHousehold?: boolean;
-  households: HouseholdData[];
-  tags: GuestTagActionData[];
+  households: Pick<GuestListHousehold, "id" | "name">[];
+  tags: GuestListTag[];
 }) {
   return (
     <form className="grid gap-3 lg:grid-cols-[minmax(220px,1.5fr)_1fr_1fr_1fr_auto]" method="get">

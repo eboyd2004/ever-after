@@ -4,6 +4,7 @@ import { FormEvent, useRef, useState, useTransition, type ReactNode } from "reac
 
 import { createGuest, type GuestActionResult, type GuestActionData } from "@/src/server/actions/guests/guest.actions";
 import type { HouseholdData } from "@/src/server/actions/guests/household.actions";
+import type { GuestListTag } from "@/src/server/repositories/guest-list.repository";
 import { Button, Input, Select } from "@/src/components/shared/ui";
 import { Modal } from "@/src/components/shared/modal";
 import { ConfirmDialog } from "@/src/components/shared/confirm-dialog";
@@ -38,7 +39,7 @@ export function GuestCreationModal({
   open: boolean;
   onClose: () => void;
   households: Pick<HouseholdData, "id" | "name">[];
-  tags: { id: string; name: string; colour: string | null }[];
+  tags: GuestListTag[];
   lockedHouseholdId?: string;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
@@ -248,7 +249,7 @@ function ControlledTextArea({ label, value, onChange }: { label: string; value: 
   return <label className="grid gap-1.5 text-xs font-medium text-[#6B6B63]">{label}<textarea className="min-h-20 rounded-[10px] border border-[#E8E8E3] bg-white px-3 py-2 text-sm outline-none focus:border-[#2D5A27] focus:ring-2 focus:ring-[#EAF0E8]" onChange={(event) => onChange(event.target.value)} value={value} /></label>;
 }
 
-function TagFields({ tags }: { tags: { id: string; name: string; colour: string | null }[] }) {
+function TagFields({ tags }: { tags: GuestListTag[] }) {
   return (
     <fieldset>
       <legend className="text-xs font-medium text-[#6B6B63]">Tags</legend>

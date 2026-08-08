@@ -4,14 +4,14 @@ import { FormEvent, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { createGuestTag } from "@/src/server/actions/guests/guest-tag.actions";
-import type { GuestTagActionData } from "@/src/server/actions/guests/guest.actions";
+import type { GuestListTag } from "@/src/server/repositories/guest-list.repository";
 import { Button } from "@/src/components/shared/ui";
 
 export function GuestTagManager({
   tags,
   canEdit,
 }: {
-  tags: GuestTagActionData[];
+  tags: GuestListTag[];
   canEdit: boolean;
 }) {
   const router = useRouter();

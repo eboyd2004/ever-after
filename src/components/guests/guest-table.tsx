@@ -6,25 +6,24 @@ import { Fragment, useState, useTransition } from "react";
 
 import { removePlusOneRelationship } from "@/src/server/actions/guests/guest.actions";
 import type {
-  GuestActionData,
-  GuestPlusOneActionData,
-} from "@/src/server/actions/guests/guest.actions";
-import type { HouseholdData, HouseholdGuestActionData } from "@/src/server/actions/guests/household.actions";
+  GuestListHousehold,
+  GuestListHouseholdGuest,
+  GuestListPlusOne,
+  GuestListStandaloneGuest,
+} from "@/src/server/repositories/guest-list.repository";
 import { Icon } from "@/src/components/shared/icons";
 import { ConfirmDialog } from "@/src/components/shared/confirm-dialog";
 import { Badge, Card, EmptyState } from "@/src/components/shared/ui";
 
-type GuestRowData = GuestPlusOneActionData & {
-  plusOneFor?: GuestActionData["plusOneFor"];
-};
+type GuestRowData = GuestListStandaloneGuest | GuestListPlusOne;
 
 export function GuestTable({
   households,
   standaloneGuests,
   search = "",
 }: {
-  households: HouseholdData[];
-  standaloneGuests: GuestActionData[];
+  households: GuestListHousehold[];
+  standaloneGuests: GuestListStandaloneGuest[];
   search?: string;
 }) {
   const [expandedHouseholds, setExpandedHouseholds] = useState<Set<string>>(
@@ -95,7 +94,7 @@ function HouseholdItem({
   onToggle,
   search,
 }: {
-  household: HouseholdData;
+  household: GuestListHousehold;
   expanded: boolean;
   onToggle: () => void;
   search: string;
@@ -202,7 +201,7 @@ function HouseholdMemberRow({
   relationshipLabel,
   search,
 }: {
-  guest: HouseholdGuestActionData;
+  guest: GuestListHouseholdGuest;
   isPrimary: boolean;
   nested?: boolean;
   relationshipLabel?: string;
@@ -295,7 +294,7 @@ function StandaloneGuestRow({
   );
 }
 
-function groupHouseholdGuests(guests: HouseholdGuestActionData[]) {
+function groupHouseholdGuests(guests: GuestListHouseholdGuest[]) {
   const guestById = new Map(guests.map((guest) => [guest.id, guest]));
   const groupedIds = new Set<string>();
   const groups = guests
@@ -303,7 +302,7 @@ function groupHouseholdGuests(guests: HouseholdGuestActionData[]) {
     .map((guest) => {
       const plusOnes = guest.plusOnes
         .map((plusOne) => guestById.get(plusOne.id))
-        .filter((plusOne): plusOne is HouseholdGuestActionData => Boolean(plusOne));
+        .filter((plusOne): plusOne is GuestListHouseholdGuest => Boolean(plusOne));
       plusOnes.forEach((plusOne) => groupedIds.add(plusOne.id));
       return { guest, plusOnes };
     });
@@ -315,7 +314,7 @@ function groupHouseholdGuests(guests: HouseholdGuestActionData[]) {
   return groups;
 }
 
-function groupGuests(guests: GuestActionData[]) {
+function groupGuests(guests: GuestListStandaloneGuest[]) {
   return guests
     .filter((guest) => !guest.plusOneFor)
     .map((guest) => ({ guest, plusOnes: guest.plusOnes }));
@@ -372,7 +371,7 @@ function RemovePlusOneButton({
   );
 }
 
-function memberMatchesSearch(guest: HouseholdGuestActionData, search: string) {
+function memberMatchesSearch(guest: GuestListHouseholdGuest, search: string) {
   const normalized = search.toLowerCase();
   return [
     guest.firstName,

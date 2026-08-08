@@ -4,10 +4,12 @@ import { GuestCreationTrigger } from "@/src/components/guests/guest-creation-tri
 import { GuestFilters } from "@/src/components/guests/guest-filters";
 import { GuestTagManager } from "@/src/components/guests/guest-tag-manager";
 import { GuestTable } from "@/src/components/guests/guest-table";
-import { getGuestTags } from "@/src/server/actions/guests/guest-tag.actions";
-import { getStandaloneGuests } from "@/src/server/actions/guests/guest.actions";
-import { getHouseholds } from "@/src/server/actions/guests/household.actions";
 import { requireWedding } from "@/src/server/auth/get-active-wedding";
+import {
+  guestListRepository,
+  GuestListRepositoryError,
+  parseGuestListFilters,
+} from "@/src/server/repositories/guest-list.repository";
 import { Icon } from "@/src/components/shared/icons";
 import { PageHeader } from "@/src/components/shared/page-header";
 import { Badge, Card } from "@/src/components/shared/ui";
@@ -33,25 +35,32 @@ export default async function GuestsPage({
   const tagId = firstParam(params.tagId);
   const unassignedHousehold = firstParam(params.unassignedHousehold) === "true";
 
-  const filters = { search, householdId, ageGroup, tagId, unassignedHousehold };
-  // Keep nested Server Action reads sequential for the local Prisma Postgres
-  // adapter, which can close connections when these start concurrently.
-  const guestsResult = await getStandaloneGuests(filters);
-  const householdsResult = await getHouseholds(filters);
-  const tagsResult = await getGuestTags();
+  const parsedFilters = parseGuestListFilters({
+    search,
+    householdId,
+    ageGroup,
+    tagId,
+    unassignedHousehold,
+  });
 
-  if (!guestsResult.success || !householdsResult.success || !tagsResult.success) {
-    let error = "Unable to load guest data.";
-    if (!guestsResult.success) error = guestsResult.error;
-    else if (!householdsResult.success) error = householdsResult.error;
-    else if (!tagsResult.success) error = tagsResult.error;
-
-    return <GuestPageError message={error} />;
+  if ("error" in parsedFilters) {
+    return <GuestPageError message={parsedFilters.error} />;
   }
 
-  const standaloneGuests = guestsResult.data;
-  const households = householdsResult.data;
-  const tags = tagsResult.data;
+  let guestList;
+  try {
+    guestList = await guestListRepository.getGuestList(
+      context.wedding.id,
+      parsedFilters.value,
+    );
+  } catch (error) {
+    const message = error instanceof GuestListRepositoryError
+      ? error.message
+      : "Unable to load guest data.";
+    return <GuestPageError message={message} />;
+  }
+
+  const { standaloneGuests, households, tags } = guestList;
   const householdGuests = households.flatMap((household) => household.guests);
   const totalGuestCount = standaloneGuests.length + householdGuests.length;
   const unassignedCount = standaloneGuests.length;
