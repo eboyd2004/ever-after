@@ -8,7 +8,7 @@ import {
   type HouseholdActionResult,
   type HouseholdData,
 } from "@/src/server/actions/guests/household.actions";
-import type { GuestTagActionData } from "@/src/server/actions/guests/guest.actions";
+import type { HouseholdListTag } from "@/src/server/repositories/household-list.repository";
 import { Button, Input, Select } from "@/src/components/shared/ui";
 import { Modal } from "@/src/components/shared/modal";
 import { ConfirmDialog } from "@/src/components/shared/confirm-dialog";
@@ -48,7 +48,7 @@ export function HouseholdCreationModal({
 }: {
   open: boolean;
   onClose: () => void;
-  tags: GuestTagActionData[];
+  tags: HouseholdListTag[];
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const router = useRouter();
@@ -219,7 +219,7 @@ function MemberFields({
   index: number;
   member: MemberDraft;
   onChange: (patch: Partial<MemberDraft>) => void;
-  tags: GuestTagActionData[];
+  tags: HouseholdListTag[];
 }) {
   const primary = index === 0;
   return (

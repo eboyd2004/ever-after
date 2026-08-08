@@ -5,24 +5,29 @@ import { Icon } from "@/src/components/shared/icons";
 import { PageHeader } from "@/src/components/shared/page-header";
 import { Card, EmptyState } from "@/src/components/shared/ui";
 import { requireWedding } from "@/src/server/auth/get-active-wedding";
-import { getHouseholds } from "@/src/server/actions/guests/household.actions";
-import { getGuestTags } from "@/src/server/actions/guests/guest-tag.actions";
+import {
+  HouseholdListRepositoryError,
+  householdListRepository,
+} from "@/src/server/repositories/household-list.repository";
 
 export const dynamic = "force-dynamic";
 
 export default async function HouseholdsPage() {
   const context = await requireWedding();
-  const result = await getHouseholds();
-  const tagsResult = await getGuestTags();
-
-  if (!result.success) {
-    return <HouseholdsError message={result.error} />;
-  }
-  if (!tagsResult.success) {
-    return <HouseholdsError message={tagsResult.error} />;
-  }
-
   const canEdit = context.role !== "VIEWER";
+
+  let result;
+  try {
+    result = await householdListRepository.getHouseholdList(
+      context.wedding.id,
+      { includeTags: canEdit },
+    );
+  } catch (error) {
+    const message = error instanceof HouseholdListRepositoryError
+      ? error.message
+      : "Unable to load households.";
+    return <HouseholdsError message={message} />;
+  }
 
   return (
     <div className="space-y-8">
@@ -36,14 +41,14 @@ export default async function HouseholdsPage() {
               <Icon name="users" size={15} />
               Guest list
             </Link>
-            {canEdit ? <HouseholdCreationTrigger tags={tagsResult.data} /> : null}
+            {canEdit ? <HouseholdCreationTrigger tags={result.tags} /> : null}
           </>
         }
       />
 
-      {result.data.length > 0 ? (
+      {result.households.length > 0 ? (
         <section className="grid gap-4 md:grid-cols-2">
-          {result.data.map((household) => (
+          {result.households.map((household) => (
             <Card className="p-5" key={household.id}>
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -60,7 +65,7 @@ export default async function HouseholdsPage() {
               </div>
               <div className="mt-5 flex items-center justify-between border-t border-[#F0EFEA] pt-4 text-xs text-[#8A8A82]">
                 <span>
-                  {household.guests.length} {household.guests.length === 1 ? "guest" : "guests"}
+                  {household.guestCount} {household.guestCount === 1 ? "guest" : "guests"}
                   {household.primaryGuest ? ` · Primary: ${household.primaryGuest.firstName} ${household.primaryGuest.lastName}` : ""}
                 </span>
                 <Link className="font-semibold text-[#2D5A27] hover:underline" href={`/guests/households/${household.id}`}>

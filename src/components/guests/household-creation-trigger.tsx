@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 
-import type { GuestTagActionData } from "@/src/server/actions/guests/guest.actions";
+import type { HouseholdListTag } from "@/src/server/repositories/household-list.repository";
 import { Button } from "@/src/components/shared/ui";
 import { Icon } from "@/src/components/shared/icons";
 import { HouseholdCreationModal } from "./household-creation-modal";
 
-export function HouseholdCreationTrigger({ tags }: { tags: GuestTagActionData[] }) {
+export function HouseholdCreationTrigger({ tags }: { tags: HouseholdListTag[] }) {
   const [open, setOpen] = useState(false);
 
   return (
