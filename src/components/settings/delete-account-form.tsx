@@ -1,14 +1,13 @@
 "use client";
 
 import { useClerk } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { deleteMyAccount } from "@/src/server/actions/account/account.actions";
+import { navigateAfterAccountDeletion } from "./account-deletion-navigation";
 
 export function DeleteAccountForm() {
   const { signOut } = useClerk();
-  const router = useRouter();
   const [confirmation, setConfirmation] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -26,17 +25,9 @@ export function DeleteAccountForm() {
         return;
       }
 
-      // Clerk deletion invalidates the account server-side. Sign out locally
-      // as well so the browser cannot retain stale session state.
-      try {
-        await signOut();
-      } catch {
-        // The account has already been deleted. Navigation below still clears
-        // the current application view if Clerk sign-out cannot complete.
-      } finally {
-        router.replace("/");
-        router.refresh();
-      }
+      await navigateAfterAccountDeletion(signOut, () => {
+        window.location.replace("/");
+      });
     });
   }
 

@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   getAuthenticatedUser: vi.fn(),
   deleteAccount: vi.fn(),
   revalidatePath: vi.fn(),
+  AccountDeletionServiceError: class AccountDeletionServiceError extends Error {},
 }));
 
 vi.mock("server-only", () => ({}));
@@ -15,7 +16,7 @@ vi.mock("../src/server/auth/get-authenticated-user", () => ({
   getAuthenticatedUser: mocks.getAuthenticatedUser,
 }));
 vi.mock("../src/server/services/account-deletion.service", () => ({
-  AccountDeletionServiceError: class AccountDeletionServiceError extends Error {},
+  AccountDeletionServiceError: mocks.AccountDeletionServiceError,
   accountDeletionService: { deleteAccount: mocks.deleteAccount },
 }));
 vi.mock("../src/server/logging/logger", () => ({
@@ -55,5 +56,20 @@ describe("deleteMyAccount", () => {
       clerkUserId: "clerk_1",
     });
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/", "layout");
+  });
+
+  it("keeps the account page in place when deletion is rejected", async () => {
+    mocks.deleteAccount.mockRejectedValue(
+      new mocks.AccountDeletionServiceError(
+        "You cannot delete your account while you own a wedding.",
+      ),
+    );
+
+    await expect(deleteMyAccount("DELETE")).resolves.toEqual({
+      success: false,
+      error: "You cannot delete your account while you own a wedding.",
+    });
+
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 });
