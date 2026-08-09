@@ -1,13 +1,19 @@
 import { PageHeader } from "@/src/components/shared/page-header";
 import { InvitationManagement } from "@/src/components/settings/invitation-management";
 import { Card } from "@/src/components/shared/ui";
-import { requireWedding } from "@/src/server/auth/get-active-wedding";
+import { WeddingRequiredState } from "@/src/components/shared/wedding-required-state";
+import { getWeddingPageContext } from "@/src/server/auth/get-wedding-page-context";
 import { listWeddingInvitations } from "@/src/server/actions/wedding/wedding.actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function InvitationsSettingsPage() {
-  const context = await requireWedding();
+  const context = await getWeddingPageContext();
+
+  if (!context) {
+    return <WeddingRequiredState feature="Workspace invitations" />;
+  }
+
   const isOwner = context.role === "OWNER";
   const invitationResult = isOwner ? await listWeddingInvitations() : null;
 

@@ -3,15 +3,18 @@ import Link from "next/link";
 import { SignOutControl } from "@/src/components/auth/sign-out-button";
 import { DeleteWeddingForm } from "@/src/components/settings/delete-wedding-form";
 import { InvitationManagement } from "@/src/components/settings/invitation-management";
+import { WeddingRequiredState } from "@/src/components/shared/wedding-required-state";
 import { Card } from "@/src/components/shared/ui";
-import { requireWedding } from "@/src/server/auth/get-active-wedding";
+import { getWeddingPageContext } from "@/src/server/auth/get-wedding-page-context";
+import { getAuthenticatedUser } from "@/src/server/auth/get-authenticated-user";
 import { listWeddingInvitations } from "@/src/server/actions/wedding/wedding.actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const context = await requireWedding();
-  const isOwner = context.role === "OWNER";
+  const context = await getWeddingPageContext();
+  const user = context?.user ?? (await getAuthenticatedUser()).user;
+  const isOwner = context?.role === "OWNER";
   const invitationResult = isOwner ? await listWeddingInvitations() : null;
 
   return (
@@ -33,7 +36,7 @@ export default async function SettingsPage() {
           <div>
             <h2 className="text-base font-semibold text-[#1C1C1C]">Account</h2>
             <p className="mt-1 text-sm text-[#7A7A6E]">
-              Signed in as {context.user.email}.
+              Signed in as {user.email}.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -48,7 +51,11 @@ export default async function SettingsPage() {
         </div>
       </Card>
 
-      {isOwner ? (
+      {!context ? (
+        <WeddingRequiredState feature="Wedding workspace settings" />
+      ) : null}
+
+      {isOwner && context ? (
         <Card className="p-5 sm:p-6">
           <InvitationManagement
             initialInvitations={invitationResult?.success ? invitationResult.data : []}
@@ -56,7 +63,7 @@ export default async function SettingsPage() {
         </Card>
       ) : null}
 
-      {isOwner ? (
+      {isOwner && context ? (
         <Card className="border-[#E7C9C5] bg-[#FFF8F6] p-5 sm:p-6">
           <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#9D3F32]">
             Danger zone
