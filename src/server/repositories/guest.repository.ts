@@ -8,6 +8,7 @@ import {
 } from "../../../app/generated/prisma/client";
 import { prisma } from "../db/prisma";
 import { logger } from "../logging/logger";
+import { ensureHouseholdPrimaryGuest } from "./household.repository";
 
 export type GuestFilters = {
   search?: string;
@@ -69,6 +70,8 @@ const guestInclude = {
   },
 } satisfies Prisma.GuestInclude;
 
+type GuestDb = Prisma.TransactionClient | typeof prisma;
+
 export class GuestRepositoryError extends Error {
   constructor(message: string) {
     super(message);
@@ -88,6 +91,11 @@ function isPrismaError(error: unknown, code: string) {
 function throwPlusOneConflict(error: unknown): never | void {
   if (isPrismaError(error, "P2002")) {
     throw new GuestRepositoryError("This guest already has a plus-one.");
+  }
+  if (isPrismaError(error, "P2034")) {
+    throw new GuestRepositoryError(
+      "The plus-one relationship changed. Please try again.",
+    );
   }
 }
 
@@ -183,12 +191,13 @@ export class GuestRepository {
   }
 
   private async validateGuestReferences(
+    db: GuestDb,
     weddingId: string,
     input: Pick<GuestInput, "householdId" | "plusOneForGuestId">,
     currentGuestId?: string,
   ) {
     if (input.householdId) {
-      const household = await prisma.household.findFirst({
+      const household = await db.household.findFirst({
         where: { id: input.householdId, weddingId },
         select: { id: true },
       });
@@ -203,10 +212,11 @@ export class GuestRepository {
         throw new GuestRepositoryError("A guest cannot be their own plus-one");
       }
 
-      const plusOneTarget = await prisma.guest.findFirst({
+      const plusOneTarget = await db.guest.findFirst({
         where: { id: input.plusOneForGuestId, weddingId },
         select: {
           id: true,
+          householdId: true,
           plusOneForGuestId: true,
           plusOnes: { select: { id: true } },
         },
@@ -226,6 +236,105 @@ export class GuestRepository {
       if (plusOneTarget.plusOnes.length > 0) {
         throw new GuestRepositoryError("This guest already has a plus-one");
       }
+
+      if ((input.householdId ?? null) !== plusOneTarget.householdId) {
+        throw new GuestRepositoryError(
+          "A guest and their plus-one must belong to the same household",
+        );
+      }
+    }
+  }
+
+  private async moveGuestWithinTransaction(
+    tx: Prisma.TransactionClient,
+    weddingId: string,
+    guestId: string,
+    householdId: string | null,
+  ) {
+    const currentGuest = await tx.guest.findFirst({
+      where: { id: guestId, weddingId },
+      select: {
+        id: true,
+        householdId: true,
+        plusOneForGuestId: true,
+        plusOneFor: {
+          select: { id: true, householdId: true, weddingId: true },
+        },
+        plusOnes: {
+          select: { id: true, householdId: true, weddingId: true },
+        },
+      },
+    });
+
+    if (!currentGuest) throw new GuestRepositoryError("Guest not found");
+    await this.validateGuestReferences(tx, weddingId, { householdId });
+
+    if (
+      currentGuest.plusOneForGuestId &&
+      currentGuest.plusOneFor?.householdId !== householdId
+    ) {
+      throw new GuestRepositoryError(
+        "A plus-one must remain in the same household as the guest they belong to",
+      );
+    }
+
+    if (currentGuest.plusOneFor?.weddingId !== undefined && currentGuest.plusOneFor.weddingId !== weddingId) {
+      throw new GuestRepositoryError("The plus-one relationship must stay within this wedding");
+    }
+
+    for (const plusOne of currentGuest.plusOnes) {
+      if (plusOne.weddingId !== weddingId) {
+        throw new GuestRepositoryError("The plus-one relationship must stay within this wedding");
+      }
+    }
+
+    const relatedGuests = [
+      {
+        id: currentGuest.id,
+        householdId: currentGuest.householdId,
+      },
+      ...(currentGuest.plusOneForGuestId
+        ? []
+        : currentGuest.plusOnes.map((plusOne) => ({
+            id: plusOne.id,
+            householdId: plusOne.householdId,
+          }))),
+    ];
+
+    const guestsToMove = relatedGuests.filter(
+      (guest) => guest.householdId !== householdId,
+    );
+    const affectedHouseholdIds = new Set<string>();
+
+    for (const guest of guestsToMove) {
+      if (guest.householdId) affectedHouseholdIds.add(guest.householdId);
+    }
+    if (householdId) affectedHouseholdIds.add(householdId);
+
+    if (guestsToMove.length > 0) {
+      await tx.household.updateMany({
+        where: {
+          weddingId,
+          primaryGuestId: { in: guestsToMove.map((guest) => guest.id) },
+        },
+        data: { primaryGuestId: null },
+      });
+
+      await tx.guest.updateMany({
+        where: {
+          weddingId,
+          id: { in: guestsToMove.map((guest) => guest.id) },
+        },
+        data: { householdId },
+      });
+    }
+
+    for (const affectedHouseholdId of affectedHouseholdIds) {
+      await ensureHouseholdPrimaryGuest(
+        tx,
+        weddingId,
+        affectedHouseholdId,
+      );
     }
   }
 
@@ -285,12 +394,13 @@ export class GuestRepository {
 
   async createGuest(weddingId: string, input: GuestInput) {
     try {
-      await this.validateGuestReferences(weddingId, input);
-
-      return await prisma.guest.create({
-        data: { weddingId, ...input },
-        include: guestInclude,
-      });
+      return await prisma.$transaction(async (tx) => {
+        await this.validateGuestReferences(tx, weddingId, input);
+        return tx.guest.create({
+          data: { weddingId, ...input },
+          include: guestInclude,
+        });
+      }, { isolationLevel: "Serializable" });
     } catch (error) {
       if (error instanceof GuestRepositoryError) throw error;
       throwPlusOneConflict(error);
@@ -304,21 +414,10 @@ export class GuestRepository {
     input: CreateGuestWithPlusOneInput,
   ) {
     try {
-      await this.validateGuestReferences(weddingId, input.primary);
-
       if (input.primary.plusOneForGuestId && input.plusOne) {
         throw new GuestRepositoryError(
           "A plus-one cannot have another plus-one",
         );
-      }
-
-      const tagIds = [...new Set(input.primaryTagIds)];
-      const tagCount = await prisma.guestTag.count({
-        where: { id: { in: tagIds }, weddingId },
-      });
-
-      if (tagCount !== tagIds.length) {
-        throw new GuestRepositoryError("One or more tags were not found");
       }
 
       const primaryId = randomUUID();
@@ -331,23 +430,32 @@ export class GuestRepository {
           }
         : null;
 
-      await prisma.$transaction([
-        prisma.guest.create({
+      await prisma.$transaction(async (tx) => {
+        await this.validateGuestReferences(tx, weddingId, input.primary);
+
+        const tagIds = [...new Set(input.primaryTagIds)];
+        const tagCount = await tx.guestTag.count({
+          where: { id: { in: tagIds }, weddingId },
+        });
+
+        if (tagCount !== tagIds.length) {
+          throw new GuestRepositoryError("One or more tags were not found");
+        }
+
+        await tx.guest.create({
           data: { id: primaryId, weddingId, ...input.primary },
-        }),
-        ...(plusOne && plusOneId
-          ? [
-              prisma.guest.create({
-                data: { id: plusOneId, weddingId, ...plusOne },
-              }),
-            ]
-          : []),
-        ...tagIds.map((tagId) =>
-          prisma.guestTagAssignment.create({
-            data: { guestId: primaryId, tagId },
-          }),
-        ),
-      ]);
+        });
+        if (plusOne && plusOneId) {
+          await tx.guest.create({
+            data: { id: plusOneId, weddingId, ...plusOne },
+          });
+        }
+        if (tagIds.length > 0) {
+          await tx.guestTagAssignment.createMany({
+            data: tagIds.map((tagId) => ({ guestId: primaryId, tagId })),
+          });
+        }
+      }, { isolationLevel: "Serializable" });
 
       return this.getGuest(weddingId, primaryId);
     } catch (error) {
@@ -367,29 +475,29 @@ export class GuestRepository {
     input: PlusOneInput,
   ) {
     try {
-      const parent = await prisma.guest.findFirst({
-        where: { id: guestId, weddingId },
-        select: {
-          id: true,
-          householdId: true,
-          plusOneForGuestId: true,
-          plusOnes: { select: { id: true } },
-        },
-      });
-
-      if (!parent) throw new GuestRepositoryError("Guest not found");
-      if (parent.plusOneForGuestId) {
-        throw new GuestRepositoryError(
-          "A plus-one cannot have another plus-one",
-        );
-      }
-      if (parent.plusOnes.length > 0) {
-        throw new GuestRepositoryError("This guest already has a plus-one");
-      }
-
       const plusOneId = randomUUID();
-      await prisma.$transaction([
-        prisma.guest.create({
+      await prisma.$transaction(async (tx) => {
+        const parent = await tx.guest.findFirst({
+          where: { id: guestId, weddingId },
+          select: {
+            id: true,
+            householdId: true,
+            plusOneForGuestId: true,
+            plusOnes: { select: { id: true } },
+          },
+        });
+
+        if (!parent) throw new GuestRepositoryError("Guest not found");
+        if (parent.plusOneForGuestId) {
+          throw new GuestRepositoryError(
+            "A plus-one cannot have another plus-one",
+          );
+        }
+        if (parent.plusOnes.length > 0) {
+          throw new GuestRepositoryError("This guest already has a plus-one");
+        }
+
+        await tx.guest.create({
           data: {
             id: plusOneId,
             weddingId,
@@ -397,8 +505,8 @@ export class GuestRepository {
             householdId: parent.householdId,
             plusOneForGuestId: parent.id,
           },
-        }),
-      ]);
+        });
+      }, { isolationLevel: "Serializable" });
 
       return this.getGuest(weddingId, guestId);
     } catch (error) {
@@ -419,70 +527,77 @@ export class GuestRepository {
         throw new GuestRepositoryError("A guest cannot be their own plus-one");
       }
 
-      const parent = await prisma.guest.findFirst({
-        where: { id: parentGuestId, weddingId },
-        select: {
-          id: true,
-          householdId: true,
-          plusOneForGuestId: true,
-          plusOnes: { select: { id: true } },
-        },
-      });
-      const plusOne = await prisma.guest.findFirst({
-        where: { id: plusOneGuestId, weddingId },
-        select: {
-          id: true,
-          householdId: true,
-          plusOneForGuestId: true,
-          plusOnes: { select: { id: true } },
-          household: { select: { primaryGuestId: true } },
-        },
-      });
-
-      if (!parent || !plusOne) {
-        throw new GuestRepositoryError("Guest not found in this wedding");
-      }
-      if (parent.plusOneForGuestId) {
-        throw new GuestRepositoryError(
-          "A plus-one cannot have another plus-one",
-        );
-      }
-      if (parent.plusOnes.length > 0) {
-        throw new GuestRepositoryError("This guest already has a plus-one");
-      }
-      if (plusOne.plusOneForGuestId) {
-        throw new GuestRepositoryError("This guest is already a plus-one");
-      }
-      if (plusOne.plusOnes.length > 0) {
-        throw new GuestRepositoryError(
-          "A guest with a plus-one cannot become a plus-one",
-        );
-      }
-      if (plusOne.household?.primaryGuestId === plusOne.id) {
-        throw new GuestRepositoryError(
-          "Change this guest's household primary invitee before attaching them as a plus-one",
-        );
-      }
-      if (
-        plusOne.householdId &&
-        plusOne.householdId !== parent.householdId
-      ) {
-        throw new GuestRepositoryError(
-          "Move this guest out of their current household before attaching them as a plus-one",
-        );
-      }
-
-      await prisma.$transaction([
-        prisma.guest.update({
-          where: { id: plusOne.id },
-          data: {
-            householdId: parent.householdId,
-            plusOneForGuestId: parent.id,
+      await prisma.$transaction(async (tx) => {
+        const parent = await tx.guest.findFirst({
+          where: { id: parentGuestId, weddingId },
+          select: {
+            id: true,
+            householdId: true,
+            plusOneForGuestId: true,
+            plusOnes: { select: { id: true } },
           },
-        }),
-      ]);
+        });
+        const plusOne = await tx.guest.findFirst({
+          where: { id: plusOneGuestId, weddingId },
+          select: {
+            id: true,
+            householdId: true,
+            plusOneForGuestId: true,
+            plusOnes: { select: { id: true } },
+            household: { select: { primaryGuestId: true } },
+          },
+        });
 
-      return this.getGuest(weddingId, parent.id);
+        if (!parent || !plusOne) {
+          throw new GuestRepositoryError("Guest not found in this wedding");
+        }
+        if (parent.plusOneForGuestId) {
+          throw new GuestRepositoryError(
+            "A plus-one cannot have another plus-one",
+          );
+        }
+        if (parent.plusOnes.length > 0) {
+          throw new GuestRepositoryError("This guest already has a plus-one");
+        }
+        if (plusOne.plusOneForGuestId) {
+          throw new GuestRepositoryError("This guest is already a plus-one");
+        }
+        if (plusOne.plusOnes.length > 0) {
+          throw new GuestRepositoryError(
+            "A guest with a plus-one cannot become a plus-one",
+          );
+        }
+        if (plusOne.household?.primaryGuestId === plusOne.id) {
+          throw new GuestRepositoryError(
+            "Change this guest's household primary invitee before attaching them as a plus-one",
+          );
+        }
+        if (plusOne.householdId !== parent.householdId) {
+          throw new GuestRepositoryError(
+            "A guest and their plus-one must belong to the same household",
+          );
+        }
+
+        // The conditional write is authoritative. A stale read cannot
+        // silently re-parent a guest another request has already attached.
+        const result = await tx.guest.updateMany({
+          where: {
+            id: plusOne.id,
+            weddingId,
+            householdId: parent.householdId,
+            plusOneForGuestId: null,
+          },
+          data: { plusOneForGuestId: parent.id },
+        });
+
+        if (result.count !== 1) {
+          throw new GuestRepositoryError(
+            "This guest changed before the plus-one relationship could be saved",
+          );
+        }
+      }, { isolationLevel: "Serializable" });
+
+      return this.getGuest(weddingId, parentGuestId);
     } catch (error) {
       if (error instanceof GuestRepositoryError) throw error;
       throwPlusOneConflict(error);
@@ -494,42 +609,65 @@ export class GuestRepository {
     }
   }
 
-  async updateGuest(weddingId: string, guestId: string, input: GuestInput) {
+  async updateGuest(
+    weddingId: string,
+    guestId: string,
+    input: GuestInput,
+    tagIds?: string[],
+  ) {
     try {
-      const currentGuest = await prisma.guest.findFirst({
-        where: { id: guestId, weddingId },
-        select: {
-          id: true,
-          householdId: true,
-          household: { select: { primaryGuestId: true } },
-        },
-      });
+      const guestData = { ...input };
+      delete guestData.plusOneForGuestId;
+      const householdId = guestData.householdId ?? null;
 
-      if (!currentGuest) throw new GuestRepositoryError("Guest not found");
-      await this.validateGuestReferences(weddingId, input, guestId);
+      return await prisma.$transaction(async (tx) => {
+        const currentGuest = await tx.guest.findFirst({
+          where: { id: guestId, weddingId },
+          select: { id: true },
+        });
 
-      const movingHousehold = currentGuest.householdId !== input.householdId;
-      const shouldClearPrimary =
-        movingHousehold && currentGuest.household?.primaryGuestId === guestId;
+        if (!currentGuest) throw new GuestRepositoryError("Guest not found");
 
-      if (shouldClearPrimary) {
-        await prisma.$transaction([
-          prisma.household.updateMany({
-            where: { weddingId, primaryGuestId: guestId },
-            data: { primaryGuestId: null },
-          }),
-          prisma.guest.update({
-            where: { id: guestId },
-            data: input,
-          }),
-        ]);
-        return this.getGuest(weddingId, guestId);
-      }
+        await this.moveGuestWithinTransaction(
+          tx,
+          weddingId,
+          guestId,
+          householdId,
+        );
 
-      return await prisma.guest.update({
-        where: { id: guestId },
-        data: input,
-        include: guestInclude,
+        if (tagIds !== undefined) {
+          const uniqueTagIds = [...new Set(tagIds)];
+          const tagCount = await tx.guestTag.count({
+            where: { id: { in: uniqueTagIds }, weddingId },
+          });
+
+          if (tagCount !== uniqueTagIds.length) {
+            throw new GuestRepositoryError("One or more tags were not found");
+          }
+
+          await tx.guestTagAssignment.deleteMany({
+            where: { guestId },
+          });
+          if (uniqueTagIds.length > 0) {
+            await tx.guestTagAssignment.createMany({
+              data: uniqueTagIds.map((tagId) => ({ guestId, tagId })),
+              skipDuplicates: true,
+            });
+          }
+        }
+
+        await tx.guest.update({
+          where: { id: guestId },
+          data: { ...guestData, householdId },
+        });
+
+        return tx.guest.findFirst({
+          where: { id: guestId, weddingId },
+          include: guestInclude,
+        });
+      }, { isolationLevel: "Serializable" }).then((guest) => {
+        if (!guest) throw new GuestRepositoryError("Guest not found");
+        return guest;
       });
     } catch (error) {
       if (error instanceof GuestRepositoryError) throw error;
@@ -541,14 +679,24 @@ export class GuestRepository {
 
   async deleteGuest(weddingId: string, guestId: string) {
     try {
-      await this.ensureGuestBelongsToWedding(guestId, weddingId);
-      await prisma.$transaction([
-        prisma.household.updateMany({
+      await prisma.$transaction(async (tx) => {
+        const guest = await tx.guest.findFirst({
+          where: { id: guestId, weddingId },
+          select: { id: true, householdId: true },
+        });
+
+        if (!guest) throw new GuestRepositoryError("Guest not found");
+
+        await tx.household.updateMany({
           where: { weddingId, primaryGuestId: guestId },
           data: { primaryGuestId: null },
-        }),
-        prisma.guest.delete({ where: { id: guestId } }),
-      ]);
+        });
+        await tx.guest.delete({ where: { id: guestId } });
+
+        if (guest.householdId) {
+          await ensureHouseholdPrimaryGuest(tx, weddingId, guest.householdId);
+        }
+      }, { isolationLevel: "Serializable" });
     } catch (error) {
       if (error instanceof GuestRepositoryError) throw error;
       logger.error("[guest-repository] delete guest failed", error);
@@ -562,38 +710,14 @@ export class GuestRepository {
     householdId: string,
   ) {
     try {
-      const currentGuest = await prisma.guest.findFirst({
-        where: { id: guestId, weddingId },
-        select: {
-          id: true,
-          householdId: true,
-          household: { select: { primaryGuestId: true } },
-        },
-      });
-
-      if (!currentGuest) throw new GuestRepositoryError("Guest not found");
-      await this.validateGuestReferences(weddingId, { householdId });
-
-      const operations = [];
-      if (
-        currentGuest.householdId !== householdId &&
-        currentGuest.household?.primaryGuestId === guestId
-      ) {
-        operations.push(
-          prisma.household.updateMany({
-            where: { weddingId, primaryGuestId: guestId },
-            data: { primaryGuestId: null },
-          }),
+      await prisma.$transaction(async (tx) => {
+        await this.moveGuestWithinTransaction(
+          tx,
+          weddingId,
+          guestId,
+          householdId,
         );
-      }
-      operations.push(
-        prisma.guest.update({
-          where: { id: guestId },
-          data: { householdId },
-        }),
-      );
-
-      await prisma.$transaction(operations);
+      }, { isolationLevel: "Serializable" });
       return this.getGuest(weddingId, guestId);
     } catch (error) {
       if (error instanceof GuestRepositoryError) throw error;
@@ -604,17 +728,9 @@ export class GuestRepository {
 
   async removeGuestFromHousehold(weddingId: string, guestId: string) {
     try {
-      await this.ensureGuestBelongsToWedding(guestId, weddingId);
-      await prisma.$transaction([
-        prisma.household.updateMany({
-          where: { weddingId, primaryGuestId: guestId },
-          data: { primaryGuestId: null },
-        }),
-        prisma.guest.update({
-          where: { id: guestId },
-          data: { householdId: null },
-        }),
-      ]);
+      await prisma.$transaction(async (tx) => {
+        await this.moveGuestWithinTransaction(tx, weddingId, guestId, null);
+      }, { isolationLevel: "Serializable" });
       return this.getGuest(weddingId, guestId);
     } catch (error) {
       if (error instanceof GuestRepositoryError) throw error;

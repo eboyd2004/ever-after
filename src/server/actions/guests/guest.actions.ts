@@ -21,10 +21,6 @@ import {
   type PlusOneInput,
 } from "../../repositories/guest.repository";
 import {
-  GuestTagRepositoryError,
-  guestTagRepository,
-} from "../../repositories/guest-tag.repository";
-import {
   firstError,
   guestAgeGroups,
   parseEmail,
@@ -338,10 +334,6 @@ async function runGuestAction<T>(
     if (error instanceof GuestRepositoryError) {
       return failure(error.message);
     }
-    if (error instanceof GuestTagRepositoryError) {
-      return failure(error.message);
-    }
-
     logger.error(`[guests] ${actionName} failed`, error);
     return failure(`Unable to ${actionName}. Please try again.`);
   }
@@ -498,19 +490,14 @@ export async function updateGuest(
 
   return runGuestAction("update guest", "edit", async (weddingId) => {
     const { tagIds, ...guestInput } = parsed.value;
-    delete guestInput.plusOneForGuestId;
-    await guestTagRepository.ensureTagsBelongToWedding(
+    const guest = await guestRepository.updateGuest(
       weddingId,
-      tagIds,
-    );
-    const guest = await guestRepository.updateGuest(weddingId, parsedValue(parsedId), guestInput);
-    const taggedGuest = await guestRepository.setGuestTags(
-      weddingId,
-      guest.id,
+      parsedValue(parsedId),
+      guestInput,
       tagIds,
     );
     revalidateGuestPaths(guest.id);
-    return mapGuest(taggedGuest);
+    return mapGuest(guest);
   });
 }
 
