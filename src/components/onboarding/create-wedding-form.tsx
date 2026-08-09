@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import { skipOnboarding } from "@/src/server/actions/onboarding/onboarding.actions";
 import { createWedding } from "@/src/server/actions/wedding/wedding.actions";
 
 export function CreateWeddingForm() {
@@ -48,6 +49,24 @@ export function CreateWeddingForm() {
         setSuccess(result.data.invitationMessage);
         setDevelopmentInvitationUrl(result.data.developmentInvitationUrl ?? null);
         setInvitePartner(false);
+        return;
+      }
+
+      router.push("/dashboard");
+      router.refresh();
+    });
+  }
+
+  function handleSkip() {
+    setError(null);
+    setSuccess(null);
+    setDevelopmentInvitationUrl(null);
+
+    startTransition(async () => {
+      const result = await skipOnboarding();
+
+      if (!result.success) {
+        setError(result.error);
         return;
       }
 
@@ -220,13 +239,23 @@ export function CreateWeddingForm() {
         </div>
       ) : null}
 
-      <button
-        className="w-full rounded-[10px] bg-[#2D5A27] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#245020] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:justify-self-start"
-        disabled={isPending}
-        type="submit"
-      >
-        {isPending ? "Creating wedding…" : "Create wedding"}
-      </button>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <button
+          className="w-full rounded-[10px] bg-[#2D5A27] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#245020] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+          disabled={isPending}
+          type="submit"
+        >
+          {isPending ? "Creating wedding…" : "Create wedding"}
+        </button>
+        <button
+          className="w-full rounded-[10px] border border-[#E4E0D4] bg-white px-5 py-3 text-sm font-medium text-[#6B6B63] transition hover:bg-[#F7F6F2] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+          disabled={isPending}
+          onClick={handleSkip}
+          type="button"
+        >
+          {isPending ? "Saving…" : "Skip for now"}
+        </button>
+      </div>
     </form>
   );
 }

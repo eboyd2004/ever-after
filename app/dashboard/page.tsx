@@ -1,11 +1,14 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { Icon, type IconName } from "@/src/components/shared/icons";
 import { AnimatedNumber } from "@/src/components/shared/animated-number";
 import { PageHeader } from "@/src/components/shared/page-header";
 import { Badge, Card, EmptyState } from "@/src/components/shared/ui";
-import { requireWedding } from "@/src/server/auth/get-active-wedding";
+import { getOnboardingState } from "@/src/server/auth/get-onboarding-state";
+import { getWeddingPageContext } from "@/src/server/auth/get-wedding-page-context";
+import { WeddingRequiredState } from "@/src/components/shared/wedding-required-state";
 import { logger } from "@/src/server/logging/logger";
 import { measurePerformance } from "@/src/server/logging/performance";
 import {
@@ -30,11 +33,11 @@ type DashboardData = {
   upcomingTasks: DashboardTask[];
 };
 
-async function loadDashboardData(): Promise<
+async function loadDashboardData(
+  context: NonNullable<Awaited<ReturnType<typeof getWeddingPageContext>>>,
+): Promise<
   { data: DashboardData } | { error: string }
 > {
-  const context = await requireWedding();
-
   try {
     const summary = await dashboardRepository.getDashboardSummary(
       context.wedding.id,
@@ -69,7 +72,19 @@ async function loadDashboardData(): Promise<
 }
 
 async function renderDashboardPage() {
-  const loaded = await loadDashboardData();
+  const context = await getWeddingPageContext();
+
+  if (!context) {
+    const { skipped } = await getOnboardingState();
+
+    if (!skipped) {
+      redirect("/onboarding");
+    }
+
+    return <WeddingRequiredState feature="Your dashboard" />;
+  }
+
+  const loaded = await loadDashboardData(context);
 
   if ("error" in loaded) {
     return (

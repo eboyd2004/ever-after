@@ -4,7 +4,8 @@ import { GuestCreationTrigger } from "@/src/components/guests/guest-creation-tri
 import { GuestFilters } from "@/src/components/guests/guest-filters";
 import { GuestTagManager } from "@/src/components/guests/guest-tag-manager";
 import { GuestTable } from "@/src/components/guests/guest-table";
-import { requireWedding } from "@/src/server/auth/get-active-wedding";
+import { WeddingRequiredState } from "@/src/components/shared/wedding-required-state";
+import { getWeddingPageContext } from "@/src/server/auth/get-wedding-page-context";
 import {
   guestListRepository,
   GuestListRepositoryError,
@@ -27,7 +28,11 @@ export default async function GuestsPage({
 }: {
   searchParams?: SearchParams;
 }) {
-  const context = await requireWedding();
+  const context = await getWeddingPageContext();
+
+  if (!context) {
+    return <WeddingRequiredState feature="Your guest list" />;
+  }
   const params = (await searchParams) ?? {};
   const search = firstParam(params.search);
   const householdId = firstParam(params.householdId);

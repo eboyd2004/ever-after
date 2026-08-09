@@ -1,10 +1,11 @@
 import Link from "next/link";
 
 import { GuestForm } from "@/src/components/guests/guest-form";
+import { WeddingRequiredState } from "@/src/components/shared/wedding-required-state";
 import { getGuestTags } from "@/src/server/actions/guests/guest-tag.actions";
 import { getGuest, getGuests } from "@/src/server/actions/guests/guest.actions";
 import { getHouseholds } from "@/src/server/actions/guests/household.actions";
-import { requireWedding } from "@/src/server/auth/get-active-wedding";
+import { getWeddingPageContext } from "@/src/server/auth/get-wedding-page-context";
 import { Icon } from "@/src/components/shared/icons";
 import { PageHeader } from "@/src/components/shared/page-header";
 import { Badge, Card } from "@/src/components/shared/ui";
@@ -16,7 +17,11 @@ export default async function GuestDetailPage({
 }: {
   params: Promise<{ guestId: string }>;
 }) {
-  const context = await requireWedding();
+  const context = await getWeddingPageContext();
+
+  if (!context) {
+    return <WeddingRequiredState feature="Guest details" />;
+  }
   const { guestId } = await params;
   const guestResult = await getGuest(guestId);
   const householdsResult = await getHouseholds();

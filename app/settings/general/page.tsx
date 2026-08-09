@@ -1,13 +1,19 @@
 import { PageHeader } from "@/src/components/shared/page-header";
 import { Card } from "@/src/components/shared/ui";
 import { WeddingGeneralForm } from "@/src/components/settings/wedding-general-form";
-import { requireWedding } from "@/src/server/auth/get-active-wedding";
+import { WeddingRequiredState } from "@/src/components/shared/wedding-required-state";
+import { getWeddingPageContext } from "@/src/server/auth/get-wedding-page-context";
 import { getWeddingGeneralSettings } from "@/src/server/actions/settings/wedding-settings.actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function GeneralSettingsPage() {
-  const context = await requireWedding();
+  const context = await getWeddingPageContext();
+
+  if (!context) {
+    return <WeddingRequiredState feature="General wedding settings" />;
+  }
+
   const result = await getWeddingGeneralSettings();
 
   return (

@@ -7,6 +7,7 @@ import { Icon, type IconName } from "@/src/components/shared/icons";
 
 export const settingsNavigationItems = [
   { href: "/settings", label: "Overview", icon: "dashboard" },
+  { href: "/settings/account", label: "Account", icon: "settings" },
   { href: "/settings/general", label: "General", icon: "settings" },
   { href: "/settings/locations", label: "Locations", icon: "pin" },
   { href: "/settings/members", label: "Members", icon: "users" },

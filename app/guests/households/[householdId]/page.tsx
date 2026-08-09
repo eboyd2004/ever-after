@@ -6,10 +6,11 @@ import { HouseholdForm } from "@/src/components/guests/household-form";
 import { Icon } from "@/src/components/shared/icons";
 import { PageHeader } from "@/src/components/shared/page-header";
 import { Badge, Card } from "@/src/components/shared/ui";
+import { WeddingRequiredState } from "@/src/components/shared/wedding-required-state";
 import { getGuests } from "@/src/server/actions/guests/guest.actions";
 import { getHousehold } from "@/src/server/actions/guests/household.actions";
 import { getGuestTags } from "@/src/server/actions/guests/guest-tag.actions";
-import { requireWedding } from "@/src/server/auth/get-active-wedding";
+import { getWeddingPageContext } from "@/src/server/auth/get-wedding-page-context";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,11 @@ export default async function HouseholdDetailPage({
 }: {
   params: Promise<{ householdId: string }>;
 }) {
-  const context = await requireWedding();
+  const context = await getWeddingPageContext();
+
+  if (!context) {
+    return <WeddingRequiredState feature="Household details" />;
+  }
   const { householdId } = await params;
   const householdResult = await getHousehold(householdId);
   const guestsResult = await getGuests({ unassignedHousehold: true });

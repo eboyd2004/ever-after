@@ -1,11 +1,24 @@
+import { redirect } from "next/navigation";
+
 import { PageHeader } from "@/src/components/shared/page-header";
 import { Card } from "@/src/components/shared/ui";
-import { requireWedding } from "@/src/server/auth/get-active-wedding";
+import {
+  AuthenticationRequiredError,
+  getAuthenticatedUser,
+} from "@/src/server/auth/get-authenticated-user";
 
 export const dynamic = "force-dynamic";
 
 export default async function PreferencesSettingsPage() {
-  await requireWedding();
+  try {
+    await getAuthenticatedUser();
+  } catch (error) {
+    if (error instanceof AuthenticationRequiredError) {
+      redirect("/sign-in");
+    }
+
+    throw error;
+  }
 
   return (
     <div className="space-y-6">

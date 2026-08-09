@@ -14,13 +14,17 @@ import { CategoryList } from "@/src/components/checklist/category-list";
 import { ChecklistPageHeader } from "@/src/components/checklist/checklist-page-header";
 import { ChecklistProgressOverview } from "@/src/components/checklist/checklist-progress-overview";
 import { ChecklistToolbar } from "@/src/components/checklist/checklist-toolbar";
+import { WeddingRequiredState } from "@/src/components/shared/wedding-required-state";
 import type {
   AssignableMemberActionData,
   CategoryActionData,
   TaskActionData,
 } from "@/src/server/actions/checklist/checklist.actions";
 import type { CategoryViewModel } from "@/src/components/checklist/types";
-import { requireWedding, type ActiveWeddingContext } from "@/src/server/auth/get-active-wedding";
+import {
+  getWeddingPageContext,
+} from "@/src/server/auth/get-wedding-page-context";
+import type { ActiveWeddingContext } from "@/src/server/auth/get-active-wedding";
 import { logger } from "@/src/server/logging/logger";
 
 export const dynamic = "force-dynamic";
@@ -46,11 +50,11 @@ type LoadedChecklistData = {
   members: AssignableMemberActionData[];
 };
 
-async function loadChecklistData(): Promise<
+async function loadChecklistData(
+  context: ActiveWeddingContext,
+): Promise<
   { data: LoadedChecklistData } | { error: string }
 > {
-  const context = await requireWedding();
-
   try {
     const categoriesResult = await getCategories();
 
@@ -98,13 +102,19 @@ function ChecklistError({ message }: { message: string }) {
 }
 
 export default async function ChecklistPage() {
-  const loaded = await loadChecklistData();
+  const context = await getWeddingPageContext();
+
+  if (!context) {
+    return <WeddingRequiredState feature="Your checklist" />;
+  }
+
+  const loaded = await loadChecklistData(context);
 
   if ("error" in loaded) {
     return <ChecklistError message={loaded.error} />;
   }
 
-  const { context, categories, members } = loaded.data;
+  const { categories, members } = loaded.data;
   const canEdit = context.role !== "VIEWER";
 
   const allTasks = categories.flatMap(({ tasks }) => tasks);

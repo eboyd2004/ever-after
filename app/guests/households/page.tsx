@@ -4,7 +4,8 @@ import { HouseholdCreationTrigger } from "@/src/components/guests/household-crea
 import { Icon } from "@/src/components/shared/icons";
 import { PageHeader } from "@/src/components/shared/page-header";
 import { Card, EmptyState } from "@/src/components/shared/ui";
-import { requireWedding } from "@/src/server/auth/get-active-wedding";
+import { WeddingRequiredState } from "@/src/components/shared/wedding-required-state";
+import { getWeddingPageContext } from "@/src/server/auth/get-wedding-page-context";
 import {
   HouseholdListRepositoryError,
   householdListRepository,
@@ -13,7 +14,11 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function HouseholdsPage() {
-  const context = await requireWedding();
+  const context = await getWeddingPageContext();
+
+  if (!context) {
+    return <WeddingRequiredState feature="Your households" />;
+  }
   const canEdit = context.role !== "VIEWER";
 
   let result;

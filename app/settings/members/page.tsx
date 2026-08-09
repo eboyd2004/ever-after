@@ -1,11 +1,16 @@
 import { PageHeader } from "@/src/components/shared/page-header";
 import { Card } from "@/src/components/shared/ui";
-import { requireWedding } from "@/src/server/auth/get-active-wedding";
+import { WeddingRequiredState } from "@/src/components/shared/wedding-required-state";
+import { getWeddingPageContext } from "@/src/server/auth/get-wedding-page-context";
 
 export const dynamic = "force-dynamic";
 
 export default async function MembersSettingsPage() {
-  await requireWedding();
+  const context = await getWeddingPageContext();
+
+  if (!context) {
+    return <WeddingRequiredState feature="Wedding members" />;
+  }
 
   return (
     <div className="space-y-6">

@@ -1,13 +1,19 @@
 import { PageHeader } from "@/src/components/shared/page-header";
 import { Card } from "@/src/components/shared/ui";
 import { WeddingLocationsForm } from "@/src/components/settings/wedding-locations-form";
-import { requireWedding } from "@/src/server/auth/get-active-wedding";
+import { WeddingRequiredState } from "@/src/components/shared/wedding-required-state";
+import { getWeddingPageContext } from "@/src/server/auth/get-wedding-page-context";
 import { getWeddingLocations } from "@/src/server/actions/settings/wedding-settings.actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function LocationsSettingsPage() {
-  const context = await requireWedding();
+  const context = await getWeddingPageContext();
+
+  if (!context) {
+    return <WeddingRequiredState feature="Wedding locations" />;
+  }
+
   const result = await getWeddingLocations();
 
   return (
