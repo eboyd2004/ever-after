@@ -1,17 +1,22 @@
 type SignOut = (options: { redirectUrl: string }) => Promise<void>;
 
+export const ACCOUNT_DELETION_ROUTE = "/goodbye";
+
 /**
- * Clerk owns the sign-out navigation. The fallback is only needed when the
- * backend deletion has already invalidated the current session before Clerk
- * can complete its client-side sign-out request.
+ * The hard navigation is intentionally independent of Clerk sign-out. The
+ * backend has already deleted the Clerk user, so the browser must leave the
+ * protected route even if Clerk can no longer resolve the old session.
  */
-export async function navigateAfterAccountDeletion(
+export function navigateAfterAccountDeletion(
   signOut: SignOut,
-  fallbackRedirect: () => void,
+  hardNavigate: (path: string) => void,
 ) {
   try {
-    await signOut({ redirectUrl: "/" });
+    void signOut({ redirectUrl: ACCOUNT_DELETION_ROUTE }).catch(() => undefined);
   } catch {
-    fallbackRedirect();
+    // The user has already been deleted. The hard navigation below remains
+    // authoritative if Clerk rejects the stale-session sign-out call.
   }
+
+  hardNavigate(ACCOUNT_DELETION_ROUTE);
 }

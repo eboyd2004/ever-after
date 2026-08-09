@@ -25,8 +25,8 @@ export function DeleteAccountForm() {
         return;
       }
 
-      await navigateAfterAccountDeletion(signOut, () => {
-        window.location.replace("/");
+      await navigateAfterAccountDeletion(signOut, (path) => {
+        window.location.assign(path);
       });
     });
   }

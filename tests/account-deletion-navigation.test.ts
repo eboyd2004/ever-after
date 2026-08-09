@@ -1,24 +1,28 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { navigateAfterAccountDeletion } from "../src/components/settings/account-deletion-navigation";
+import {
+  ACCOUNT_DELETION_ROUTE,
+  navigateAfterAccountDeletion,
+} from "../src/components/settings/account-deletion-navigation";
 
 describe("navigateAfterAccountDeletion", () => {
-  it("delegates public-home navigation to Clerk sign-out", async () => {
+  it("hard-navigates to the public post-deletion route without awaiting Clerk", async () => {
     const signOut = vi.fn().mockResolvedValue(undefined);
-    const fallbackRedirect = vi.fn();
+    const hardNavigate = vi.fn();
 
-    await navigateAfterAccountDeletion(signOut, fallbackRedirect);
+    await navigateAfterAccountDeletion(signOut, hardNavigate);
 
-    expect(signOut).toHaveBeenCalledWith({ redirectUrl: "/" });
-    expect(fallbackRedirect).not.toHaveBeenCalled();
+    expect(signOut).toHaveBeenCalledWith({ redirectUrl: ACCOUNT_DELETION_ROUTE });
+    expect(signOut).not.toHaveBeenCalledWith({ redirectUrl: "/settings/account" });
+    expect(hardNavigate).toHaveBeenCalledWith(ACCOUNT_DELETION_ROUTE);
   });
 
-  it("falls back to a full public-home navigation when the deleted session cannot sign out", async () => {
+  it("hard-navigates even when the deleted session cannot sign out", async () => {
     const signOut = vi.fn().mockRejectedValue(new Error("session deleted"));
-    const fallbackRedirect = vi.fn();
+    const hardNavigate = vi.fn();
 
-    await navigateAfterAccountDeletion(signOut, fallbackRedirect);
+    await navigateAfterAccountDeletion(signOut, hardNavigate);
 
-    expect(fallbackRedirect).toHaveBeenCalledOnce();
+    expect(hardNavigate).toHaveBeenCalledWith(ACCOUNT_DELETION_ROUTE);
   });
 });
