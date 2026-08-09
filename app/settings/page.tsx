@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { SignOutControl } from "@/src/components/auth/sign-out-button";
 import { DeleteWeddingForm } from "@/src/components/settings/delete-wedding-form";
 import { InvitationManagement } from "@/src/components/settings/invitation-management";
@@ -34,7 +36,15 @@ export default async function SettingsPage() {
               Signed in as {context.user.email}.
             </p>
           </div>
-          <SignOutControl />
+          <div className="flex flex-wrap gap-2">
+            <Link
+              className="inline-flex items-center justify-center rounded-[10px] border border-[#E4E0D4] bg-white px-4 py-2 text-sm font-medium text-[#1C1C1C] transition hover:border-[#C9DCC5] hover:bg-[#F7FBF5]"
+              href="/settings/account"
+            >
+              Account settings
+            </Link>
+            <SignOutControl />
+          </div>
         </div>
       </Card>
 
