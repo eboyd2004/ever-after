@@ -19,7 +19,7 @@ export default async function OnboardingPage() {
           <span aria-hidden="true" className="text-lg">✦</span>
         </div>
         <p className="mt-7 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#2D5A27]">
-          Welcome to Ever After
+          Welcome to Tied Forever
         </p>
         <h1 className="mt-2 font-serif text-3xl tracking-[-0.03em] text-[#1C1C1C] sm:text-4xl">
           Let&apos;s set up your wedding workspace.
@@ -32,4 +32,3 @@ export default async function OnboardingPage() {
     </main>
   );
 }
-

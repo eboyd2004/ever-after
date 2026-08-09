@@ -60,7 +60,7 @@ export default async function InvitationAcceptancePage({
   } catch (error) {
     if (!(error instanceof AuthenticationRequiredError)) {
       logger.error("[wedding-invitation] authenticated invitation check failed", error);
-      return <InvitationState title="Account verification required" message="Finish verifying your Ever After account before accepting this invitation." />;
+      return <InvitationState title="Account verification required" message="Finish verifying your Tied Forever account before accepting this invitation." />;
     }
   }
 
@@ -81,7 +81,7 @@ export default async function InvitationAcceptancePage({
           Join {invitation.weddingName}
         </h1>
         <p className="mt-3 text-sm leading-6 text-[#7A7A6E]">
-          {invitation.inviterName} invited you to join their private Ever After wedding workspace as an owner.
+          {invitation.inviterName} invited you to join their private Tied Forever wedding workspace as an owner.
         </p>
         <p className="mt-4 rounded-lg bg-[#FBF5E6] px-3 py-2 text-sm text-[#6B5630]">
           This invitation was issued to <strong>{invitation.invitedEmail}</strong> and expires on {formatDate(invitation.expiresAt)}.
@@ -140,7 +140,7 @@ function InvitationLayout({ children }: { children: ReactNode }) {
     <main className="flex min-h-screen items-center justify-center bg-[#FAFAF8] px-5 py-12">
       <section className="w-full max-w-xl rounded-[20px] border border-[#E4E0D4] bg-white p-7 shadow-[0_4px_16px_rgba(0,0,0,0.06)] sm:p-10">
         <Link className="font-serif text-[28px] leading-none text-[#1C1C1C]" href="/">
-          Ever After
+          Tied Forever
         </Link>
         {children}
       </section>
@@ -157,7 +157,7 @@ function InvitationState({ title, message }: { title: string; message: string })
       <h1 className="mt-2 font-serif text-3xl tracking-[-0.03em] text-[#1C1C1C]">{title}</h1>
       <p className="mt-3 text-sm leading-6 text-[#7A7A6E]">{message}</p>
       <Link className="mt-7 inline-flex rounded-[10px] bg-[#2D5A27] px-4 py-2.5 text-sm font-semibold text-white" href="/">
-        Return to Ever After
+        Return to Tied Forever
       </Link>
     </InvitationLayout>
   );

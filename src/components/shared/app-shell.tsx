@@ -86,7 +86,7 @@ export function AppShell({ children, context }: AppShellProps) {
             </span>
             <span>
               <span className="block font-serif text-[19px] leading-none text-[#1C1C1C]">
-                Ever After
+                Tied Forever
               </span>
               <span className="mt-1 block text-[10px] font-medium tracking-[0.06em] text-[#7A7A6E]">
                 WEDDING PLANNER
