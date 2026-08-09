@@ -132,6 +132,7 @@ export default async function GuestsPage({
       </div>
 
       <GuestTable
+        canEdit={canEdit}
         households={households}
         key={`${search ?? ""}-${householdId ?? ""}-${ageGroup ?? ""}-${tagId ?? ""}-${unassignedHousehold}`}
         search={search}

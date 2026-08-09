@@ -405,13 +405,10 @@ export async function createHousehold(
   const parsed = parseHouseholdInput(input);
   if ("error" in parsed) return failure(parsed.error);
 
-  return runHouseholdAction("create household", "edit", async (weddingId) => {
-    const household = await householdRepository.createHousehold(
-      weddingId,
-      parsed.value,
+  return runHouseholdAction("create household", "edit", async () => {
+    throw new HouseholdRepositoryError(
+      "A household must be created with at least one guest",
     );
-    revalidateHouseholdPaths(household.id);
-    return mapHousehold(household);
   });
 }
 

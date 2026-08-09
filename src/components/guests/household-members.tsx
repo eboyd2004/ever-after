@@ -115,7 +115,7 @@ export function HouseholdMembers({
               </span>
               <div className="flex flex-wrap items-center justify-end gap-2">
                 {household.primaryGuestId === guest.id ? <Badge tone="success">Primary invitee</Badge> : null}
-                {canEdit && household.primaryGuestId !== guest.id ? (
+                {canEdit && !guest.plusOneFor && household.primaryGuestId !== guest.id ? (
                   <Button disabled={isPending} onClick={() => makePrimary(guest.id)} type="button" variant="ghost">
                     Make primary
                   </Button>

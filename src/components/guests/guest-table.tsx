@@ -18,10 +18,12 @@ import { Badge, Card, EmptyState } from "@/src/components/shared/ui";
 type GuestRowData = GuestListStandaloneGuest | GuestListPlusOne;
 
 export function GuestTable({
+  canEdit,
   households,
   standaloneGuests,
   search = "",
 }: {
+  canEdit: boolean;
   households: GuestListHousehold[];
   standaloneGuests: GuestListStandaloneGuest[];
   search?: string;
@@ -57,6 +59,7 @@ export function GuestTable({
       <div className="divide-y divide-[#F0EFEA]">
         {households.map((household) => (
           <HouseholdItem
+            canEdit={canEdit}
             expanded={Boolean(search.trim()) || expandedHouseholds.has(household.id)}
             household={household}
             key={household.id}
@@ -67,7 +70,7 @@ export function GuestTable({
 
         {standaloneGroups.map(({ guest, plusOnes }) => (
           <div className="border-b border-[#F0EFEA] px-0 last:border-b-0" key={guest.id}>
-            <StandaloneGuestRow guest={guest} search={search} />
+            <StandaloneGuestRow canEdit={canEdit} guest={guest} search={search} />
             {plusOnes.length > 0 ? (
               <div className="pb-4">
                 {plusOnes.map((plusOne) => (
@@ -76,6 +79,7 @@ export function GuestTable({
                     key={plusOne.id}
                     nested
                     relationshipLabel={`Plus-one of ${guest.firstName} ${guest.lastName}`}
+                    canEdit={canEdit}
                     search={search}
                   />
                 ))}
@@ -89,11 +93,13 @@ export function GuestTable({
 }
 
 function HouseholdItem({
+  canEdit,
   household,
   expanded,
   onToggle,
   search,
 }: {
+  canEdit: boolean;
   household: GuestListHousehold;
   expanded: boolean;
   onToggle: () => void;
@@ -168,12 +174,14 @@ function HouseholdItem({
               {household.guests.length > 0 ? groupHouseholdGuests(household.guests).map(({ guest, plusOnes }) => (
                 <Fragment key={guest.id}>
                   <HouseholdMemberRow
+                    canEdit={canEdit}
                     guest={guest}
                     isPrimary={guest.id === household.primaryGuestId}
                     search={search}
                   />
                   {plusOnes.map((plusOne) => (
                     <HouseholdMemberRow
+                      canEdit={canEdit}
                       guest={plusOne}
                       isPrimary={plusOne.id === household.primaryGuestId}
                       key={plusOne.id}
@@ -195,12 +203,14 @@ function HouseholdItem({
 }
 
 function HouseholdMemberRow({
+  canEdit,
   guest,
   isPrimary,
   nested = false,
   relationshipLabel,
   search,
 }: {
+  canEdit: boolean;
   guest: GuestListHouseholdGuest;
   isPrimary: boolean;
   nested?: boolean;
@@ -234,7 +244,7 @@ function HouseholdMemberRow({
             {guest.tags.map((tag) => <Badge key={tag.id} tone="success">{tag.name}</Badge>)}
           </span>
         </Link>
-        {nested ? (
+        {nested && canEdit ? (
           <div className="mt-3 flex flex-wrap items-center gap-3 text-xs font-semibold">
             <RemovePlusOneButton guestId={guest.id} guestName={`${guest.firstName} ${guest.lastName}`} />
           </div>
@@ -245,11 +255,13 @@ function HouseholdMemberRow({
 }
 
 function StandaloneGuestRow({
+  canEdit,
   guest,
   nested = false,
   relationshipLabel,
   search,
 }: {
+  canEdit: boolean;
   guest: GuestRowData;
   nested?: boolean;
   relationshipLabel?: string;
@@ -279,7 +291,7 @@ function StandaloneGuestRow({
             {guest.tags.map((tag) => <Badge key={tag.id} tone="success">{tag.name}</Badge>)}
           </span>
         </Link>
-        {nested ? (
+        {nested && canEdit ? (
           <div className="mt-3 flex flex-wrap items-center gap-3 text-xs font-semibold">
             <RemovePlusOneButton guestId={guest.id} guestName={`${guest.firstName} ${guest.lastName}`} />
           </div>
