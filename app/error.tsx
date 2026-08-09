@@ -25,7 +25,7 @@ export default function GlobalError({
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#9D3F32]">
           Something went wrong
         </p>
-        <h1 className="mt-2 text-2xl font-semibold">Ever After could not load this page</h1>
+        <h1 className="mt-2 text-2xl font-semibold">Tied Forever could not load this page</h1>
         <p className="mt-3 text-sm leading-6 text-[#7A4A43]">
           Try again, or return to the dashboard if the problem continues.
         </p>

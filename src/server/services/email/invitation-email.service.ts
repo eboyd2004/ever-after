@@ -43,14 +43,14 @@ export function renderWeddingInvitationEmail(input: WeddingInvitationEmailInput)
   const expiry = escapeHtml(formatExpiry(input.expiresAt));
 
   return {
-    subject: `${input.inviterFirstName} invited you to Ever After`,
-    html: `<p>${inviter} invited you to join <strong>${weddingName}</strong> on Ever After.</p>
+    subject: `${input.inviterFirstName} invited you to Tied Forever`,
+    html: `<p>${inviter} invited you to join <strong>${weddingName}</strong> on Tied Forever.</p>
 <p>Use the button below to join the private wedding planning workspace. This invitation expires on ${expiry}.</p>
 <p><a href="${invitationUrl}">Join wedding</a></p>
 <p>If the button does not work, copy and paste this URL:</p>
 <p>${invitationUrl}</p>
 <p>This invitation should only be used by the invited email address.</p>`,
-    text: `${input.inviterFirstName} invited you to join ${input.weddingName} on Ever After.
+    text: `${input.inviterFirstName} invited you to join ${input.weddingName} on Tied Forever.
 
 Join wedding: ${input.invitationUrl}
 

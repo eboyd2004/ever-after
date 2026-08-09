@@ -23,8 +23,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Ever After Wedding Planner",
-  description: "Plan every detail of your wedding in one place.",
+  applicationName: "Tied Forever",
+  title: "Tied Forever Wedding Planner",
+  description: "Plan every detail of your wedding with Tied Forever.",
+  openGraph: {
+    title: "Tied Forever Wedding Planner",
+    description: "Plan every detail of your wedding with Tied Forever.",
+    siteName: "Tied Forever",
+    type: "website",
+  },
 };
 
 export const dynamic = "force-dynamic";

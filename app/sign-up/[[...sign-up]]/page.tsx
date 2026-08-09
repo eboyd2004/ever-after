@@ -26,7 +26,7 @@ export default async function SignUpPage({
             className="font-serif text-[28px] leading-none text-[#1C1C1C]"
             href="/"
           >
-            Ever After
+            Tied Forever
           </Link>
           <p className="mt-2 text-[11px] font-medium tracking-[0.14em] text-[#7A7A6E]">
             WEDDING PLANNER

@@ -16,7 +16,7 @@ export default async function Home() {
           <span aria-hidden="true" className="text-xl">✦</span>
         </div>
         <p className="mt-6 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#2D5A27]">
-          Ever After
+          Tied Forever
         </p>
         <h1 className="mt-2 font-serif text-4xl tracking-[-0.03em] text-[#1C1C1C] sm:text-5xl">
           Plan your day beautifully.
