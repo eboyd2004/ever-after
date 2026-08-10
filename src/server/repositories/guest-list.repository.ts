@@ -11,7 +11,6 @@ import {
   guestAgeGroups,
   parseEnum,
   parseId,
-  parseOptionalBoolean,
   parseOptionalText,
   parsedValue,
 } from "../actions/guests/validation";
@@ -19,6 +18,12 @@ import {
 export type GuestListTag = {
   id: string;
   name: string;
+};
+
+export type GuestListSection = {
+  id: string;
+  name: string;
+  active: boolean;
 };
 
 export type GuestListName = {
@@ -36,6 +41,7 @@ export type GuestListPlusOne = {
   phone: string | null;
   ageGroup: GuestAgeGroup;
   tags: GuestListTag[];
+  sections: GuestListSection[];
   plusOneFor?: GuestListName | null;
 };
 
@@ -48,6 +54,7 @@ export type GuestListStandaloneGuest = {
   phone: string | null;
   ageGroup: GuestAgeGroup;
   tags: GuestListTag[];
+  sections: GuestListSection[];
   plusOneFor: null;
   plusOnes: GuestListPlusOne[];
 };
@@ -61,6 +68,7 @@ export type GuestListHouseholdGuest = {
   phone: string | null;
   ageGroup: GuestAgeGroup;
   tags: GuestListTag[];
+  sections: GuestListSection[];
   plusOneFor: GuestListName | null;
   plusOnes: { id: string }[];
 };
@@ -83,18 +91,16 @@ export type GuestListData = {
 
 export type GuestListFilters = {
   search?: string;
-  householdId?: string;
   ageGroup?: GuestAgeGroup;
   tagId?: string;
-  unassignedHousehold?: boolean;
+  sectionId?: string;
 };
 
 export type GuestListFiltersInput = {
   search?: unknown;
-  householdId?: unknown;
   ageGroup?: unknown;
   tagId?: unknown;
-  unassignedHousehold?: unknown;
+  sectionId?: unknown;
 };
 
 export type GuestListFilterResult =
@@ -114,6 +120,18 @@ const standaloneGuestSelect = {
   email: true,
   phone: true,
   ageGroup: true,
+  sectionAssignments: {
+    select: {
+      section: {
+        select: {
+          id: true,
+          name: true,
+          active: true,
+        },
+      },
+    },
+    orderBy: { section: { position: "asc" } },
+  },
   tagAssignments: {
     select: {
       tag: { select: guestListTagSelect },
@@ -129,6 +147,18 @@ const standaloneGuestSelect = {
       email: true,
       phone: true,
       ageGroup: true,
+      sectionAssignments: {
+        select: {
+          section: {
+            select: {
+              id: true,
+              name: true,
+              active: true,
+            },
+          },
+        },
+        orderBy: { section: { position: "asc" } },
+      },
       tagAssignments: {
         select: {
           tag: { select: guestListTagSelect },
@@ -162,6 +192,18 @@ const householdSelect = {
       email: true,
       phone: true,
       ageGroup: true,
+      sectionAssignments: {
+        select: {
+          section: {
+            select: {
+              id: true,
+              name: true,
+              active: true,
+            },
+          },
+        },
+        orderBy: { section: { position: "asc" } },
+      },
       tagAssignments: {
         select: {
           tag: { select: guestListTagSelect },
@@ -203,10 +245,6 @@ export function parseGuestListFilters(
   input: GuestListFiltersInput = {},
 ): GuestListFilterResult {
   const search = parseOptionalText(input.search, "Search", 100);
-  const householdId =
-    input.householdId === undefined || input.householdId === ""
-      ? { value: undefined }
-      : parseId(input.householdId, "Household");
   const tagId =
     input.tagId === undefined || input.tagId === ""
       ? { value: undefined }
@@ -215,13 +253,15 @@ export function parseGuestListFilters(
     input.ageGroup === undefined || input.ageGroup === ""
       ? { value: undefined }
       : parseEnum(input.ageGroup, "Age group", guestAgeGroups);
-  const unassignedHousehold = parseOptionalBoolean(input.unassignedHousehold);
+  const sectionId =
+    input.sectionId === undefined || input.sectionId === ""
+      ? { value: undefined }
+      : parseId(input.sectionId, "Wedding section");
   const error = firstError(
     search,
-    householdId,
     tagId,
     ageGroup,
-    unassignedHousehold,
+    sectionId,
   );
 
   if (error) return { error };
@@ -229,10 +269,9 @@ export function parseGuestListFilters(
   return {
     value: {
       search: parsedValue(search) ?? undefined,
-      householdId: parsedValue(householdId),
       ageGroup: parsedValue(ageGroup),
       tagId: parsedValue(tagId),
-      unassignedHousehold: parsedValue(unassignedHousehold),
+      sectionId: parsedValue(sectionId),
     },
   };
 }
@@ -260,6 +299,33 @@ function buildStandaloneGuestWhere(
         {
           plusOnes: {
             some: { tagAssignments: { some: { tagId: filters.tagId } } },
+          },
+        },
+      ],
+    });
+  }
+
+  if (filters.sectionId) {
+    and.push({
+      OR: [
+        {
+          sectionAssignments: {
+            some: {
+              sectionId: filters.sectionId,
+              section: { weddingId },
+            },
+          },
+        },
+        {
+          plusOnes: {
+            some: {
+              sectionAssignments: {
+                some: {
+                  sectionId: filters.sectionId,
+                  section: { weddingId },
+                },
+              },
+            },
           },
         },
       ],
@@ -306,6 +372,28 @@ function buildStandaloneGuestWhere(
           ],
         }
       : {}),
+  };
+}
+
+function buildHouseholdSectionGuestWhere(
+  weddingId: string,
+  sectionId: string,
+): Prisma.GuestWhereInput {
+  const assignment = {
+    sectionAssignments: {
+      some: {
+        sectionId,
+        section: { weddingId },
+      },
+    },
+  } satisfies Prisma.GuestWhereInput;
+
+  return {
+    OR: [
+      assignment,
+      { plusOneFor: assignment },
+      { plusOnes: { some: assignment } },
+    ],
   };
 }
 
@@ -374,9 +462,16 @@ function buildHouseholdWhere(
     });
   }
 
+  if (filters.sectionId) {
+    and.push({
+      guests: {
+        some: buildHouseholdSectionGuestWhere(weddingId, filters.sectionId),
+      },
+    });
+  }
+
   return {
     weddingId,
-    id: filters.householdId,
     AND: and,
   };
 }
@@ -385,6 +480,12 @@ function mapTags(
   assignments: Array<{ tag: GuestListTag }>,
 ): GuestListTag[] {
   return assignments.map(({ tag }) => tag);
+}
+
+function mapSections(
+  assignments: Array<{ section: GuestListSection }>,
+): GuestListSection[] {
+  return assignments.map(({ section }) => section);
 }
 
 function mapStandaloneGuest(guest: StandaloneGuestRecord): GuestListStandaloneGuest {
@@ -397,6 +498,7 @@ function mapStandaloneGuest(guest: StandaloneGuestRecord): GuestListStandaloneGu
     phone: guest.phone,
     ageGroup: guest.ageGroup,
     tags: mapTags(guest.tagAssignments),
+    sections: mapSections(guest.sectionAssignments),
     plusOneFor: null,
     plusOnes: guest.plusOnes.map((plusOne) => ({
       id: plusOne.id,
@@ -407,6 +509,7 @@ function mapStandaloneGuest(guest: StandaloneGuestRecord): GuestListStandaloneGu
       phone: plusOne.phone,
       ageGroup: plusOne.ageGroup,
       tags: mapTags(plusOne.tagAssignments),
+      sections: mapSections(plusOne.sectionAssignments),
     })),
   };
 }
@@ -428,6 +531,7 @@ function mapHousehold(household: HouseholdRecord): GuestListHousehold {
       phone: guest.phone,
       ageGroup: guest.ageGroup,
       tags: mapTags(guest.tagAssignments),
+      sections: mapSections(guest.sectionAssignments),
       plusOneFor: guest.plusOneFor,
       plusOnes: guest.plusOnes,
     })),
@@ -451,8 +555,6 @@ export class GuestListRepository {
     filters: GuestListFilters,
   ): Promise<GuestListStandaloneGuest[]> {
     try {
-      if (filters.householdId) return [];
-
       const guests = await prisma.guest.findMany({
         where: buildStandaloneGuestWhere(weddingId, filters),
         select: standaloneGuestSelect,
@@ -471,11 +573,17 @@ export class GuestListRepository {
     filters: GuestListFilters,
   ): Promise<GuestListHousehold[]> {
     try {
-      if (filters.unassignedHousehold) return [];
-
       const households = await prisma.household.findMany({
         where: buildHouseholdWhere(weddingId, filters),
-        select: householdSelect,
+        select: filters.sectionId
+          ? {
+              ...householdSelect,
+              guests: {
+                ...householdSelect.guests,
+                where: buildHouseholdSectionGuestWhere(weddingId, filters.sectionId),
+              },
+            }
+          : householdSelect,
         orderBy: [{ name: "asc" }],
       });
 

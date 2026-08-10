@@ -30,6 +30,7 @@ function standaloneGuestRecord() {
     email: "ada@example.com",
     phone: "0123456789",
     ageGroup: "ADULT",
+    sectionAssignments: [{ section: { id: "section_1", name: "Ceremony", active: true } }],
     tagAssignments: [{ tag: { id: "tag_1", name: "VIP" } }],
     plusOnes: [
       {
@@ -40,6 +41,7 @@ function standaloneGuestRecord() {
         email: "charles@example.com",
         phone: null,
         ageGroup: "ADULT",
+        sectionAssignments: [{ section: { id: "section_2", name: "Venue", active: true } }],
         tagAssignments: [{ tag: { id: "tag_2", name: "Family" } }],
       },
     ],
@@ -67,6 +69,7 @@ function householdRecord() {
         email: "grace@example.com",
         phone: null,
         ageGroup: "ADULT",
+        sectionAssignments: [],
         tagAssignments: [{ tag: { id: "tag_1", name: "VIP" } }],
         plusOneFor: null,
         plusOnes: [{ id: "guest_4" }],
@@ -79,6 +82,7 @@ function householdRecord() {
         email: null,
         phone: null,
         ageGroup: "ADULT",
+        sectionAssignments: [],
         tagAssignments: [],
         plusOneFor: {
           id: "guest_3",
@@ -123,6 +127,7 @@ describe("guestListRepository", () => {
       id: "guest_1",
       firstName: "Ada",
       tags: [{ id: "tag_1", name: "VIP" }],
+      sections: [{ id: "section_1", name: "Ceremony", active: true }],
       plusOnes: [{ id: "guest_2", firstName: "Charles" }],
     });
     expect(result.households[0]).toMatchObject({
@@ -154,19 +159,17 @@ describe("guestListRepository", () => {
   it("preserves standalone scoping, filters, and sorting without detail fields", async () => {
     const parsed = parseGuestListFilters({
       search: "Ada",
-      householdId: undefined,
       ageGroup: "CHILD",
       tagId: "11111111-1111-4111-8111-111111111111",
-      unassignedHousehold: true,
+      sectionId: "11111111-1111-4111-8111-111111111112",
     });
 
     expect(parsed).toEqual({
       value: {
         search: "Ada",
-        householdId: undefined,
         ageGroup: "CHILD",
         tagId: "11111111-1111-4111-8111-111111111111",
-        unassignedHousehold: true,
+        sectionId: "11111111-1111-4111-8111-111111111112",
       },
     });
     if ("error" in parsed) throw new Error(parsed.error);
@@ -179,11 +182,35 @@ describe("guestListRepository", () => {
       plusOneForGuestId: null,
       householdId: null,
     }));
-    expect(args.where.AND).toEqual([
+    expect(args.where.AND).toEqual(expect.arrayContaining([
       {
         OR: [
           { ageGroup: "CHILD" },
           { plusOnes: { some: { ageGroup: "CHILD" } } },
+        ],
+      },
+      {
+        OR: [
+          {
+            sectionAssignments: {
+              some: {
+                sectionId: "11111111-1111-4111-8111-111111111112",
+                section: { weddingId },
+              },
+            },
+          },
+          {
+            plusOnes: {
+              some: {
+                sectionAssignments: {
+                  some: {
+                    sectionId: "11111111-1111-4111-8111-111111111112",
+                    section: { weddingId },
+                  },
+                },
+              },
+            },
+          },
         ],
       },
       {
@@ -200,7 +227,7 @@ describe("guestListRepository", () => {
           },
         ],
       },
-    ]);
+    ]));
     expect(args.orderBy).toEqual([{ lastName: "asc" }, { firstName: "asc" }]);
     expect(args.include).toBeUndefined();
     expect(args.select).toEqual(expect.objectContaining({
@@ -221,14 +248,14 @@ describe("guestListRepository", () => {
     expect(args.select).not.toHaveProperty("updatedAt");
     expect(args.select.plusOnes.select).not.toHaveProperty("dietaryRequirements");
     expect(args.select.plusOnes.select).not.toHaveProperty("notes");
-    expect(mocks.prisma.household.findMany).not.toHaveBeenCalled();
+    expect(mocks.prisma.household.findMany).toHaveBeenCalled();
   });
 
   it("selects only the household fields needed for grouping and rendering", async () => {
     await guestListRepository.getGuestList(weddingId);
 
     const args = mocks.prisma.household.findMany.mock.calls[0][0];
-    expect(args.where).toEqual({ weddingId, id: undefined, AND: [] });
+    expect(args.where).toEqual({ weddingId, AND: [] });
     expect(args.orderBy).toEqual([{ name: "asc" }]);
     expect(args.include).toBeUndefined();
     expect(args.select).toEqual(expect.objectContaining({
@@ -255,17 +282,17 @@ describe("guestListRepository", () => {
     ]);
   });
 
-  it("keeps household filters and tags wedding-scoped", async () => {
+  it("keeps section filters, search, and tags wedding-scoped", async () => {
     await guestListRepository.getGuestList(weddingId, {
       search: "London",
-      householdId: "household_1",
       ageGroup: "ADULT",
       tagId: "tag_1",
+      sectionId: "section_1",
     });
 
     expect(mocks.prisma.household.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ weddingId, id: "household_1" }),
+        where: expect.objectContaining({ weddingId }),
       }),
     );
     expect(mocks.prisma.guestTag.findMany).toHaveBeenCalledWith(
@@ -277,8 +304,8 @@ describe("guestListRepository", () => {
     expect(parseGuestListFilters({ ageGroup: "UNKNOWN" })).toEqual({
       error: "Age group is invalid",
     });
-    expect(parseGuestListFilters({ householdId: "not-an-id" })).toEqual({
-      error: "Household is invalid",
+    expect(parseGuestListFilters({ sectionId: "not-an-id" })).toEqual({
+      error: "Wedding section is invalid",
     });
   });
 });

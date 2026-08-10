@@ -15,12 +15,15 @@ import {
   type GuestTagActionData,
 } from "@/src/server/actions/guests/guest.actions";
 import type { HouseholdData } from "@/src/server/actions/guests/household.actions";
+import type { GuestListSection } from "@/src/server/repositories/guest-list.repository";
 import { Button, Select } from "@/src/components/shared/ui";
 import { ConfirmDialog } from "@/src/components/shared/confirm-dialog";
+import { GuestSectionSelector } from "./guest-section-selector";
 
 type GuestFormProps = {
   guest?: GuestActionData;
   households: Pick<HouseholdData, "id" | "name">[];
+  sections: GuestListSection[];
   tags: GuestTagActionData[];
   existingGuests?: Pick<GuestActionData, "id" | "firstName" | "lastName">[];
 };
@@ -28,6 +31,7 @@ type GuestFormProps = {
 export function GuestForm({
   guest,
   households,
+  sections,
   tags,
   existingGuests = [],
 }: GuestFormProps) {
@@ -41,6 +45,9 @@ export function GuestForm({
   const [confirmation, setConfirmation] = useState<"collapse" | "delete" | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>(
     guest?.tags.map((tag) => tag.id) ?? [],
+  );
+  const [selectedSections, setSelectedSections] = useState<string[]>(
+    guest?.sections.map((section) => section.id) ?? [],
   );
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -61,6 +68,7 @@ export function GuestForm({
       dietaryRequirements: formData.get("dietaryRequirements"),
       notes: formData.get("notes"),
       tagIds: selectedTags,
+      sectionIds: selectedSections,
     };
 
     startTransition(async () => {
@@ -77,6 +85,7 @@ export function GuestForm({
       if (!guest) {
         form.reset();
         setSelectedTags([]);
+        setSelectedSections([]);
       }
       router.refresh();
     });
@@ -235,6 +244,13 @@ export function GuestForm({
           )}
         </div>
       </fieldset>
+
+      <GuestSectionSelector
+        existingInactiveSections={guest?.sections.filter((section) => !section.active)}
+        onChange={setSelectedSections}
+        sections={sections}
+        selectedSectionIds={selectedSections}
+      />
 
       {guest?.plusOneFor ? (
         <div className="rounded-xl border border-[#DDEBD9] bg-[#F7FBF5] p-4 text-sm text-[#6B6B63]">

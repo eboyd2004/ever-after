@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   requireRole: vi.fn(),
   deleteGuest: vi.fn(),
+  updateGuest: vi.fn(),
   deleteHousehold: vi.fn(),
   createHousehold: vi.fn(),
 }));
@@ -28,7 +29,7 @@ vi.mock("../src/server/logging/logger", () => ({
 }));
 vi.mock("../src/server/repositories/guest.repository", () => ({
   GuestRepositoryError: class GuestRepositoryError extends Error {},
-  guestRepository: { deleteGuest: mocks.deleteGuest },
+  guestRepository: { deleteGuest: mocks.deleteGuest, updateGuest: mocks.updateGuest },
 }));
 vi.mock("../src/server/repositories/household.repository", () => ({
   HouseholdRepositoryError: class HouseholdRepositoryError extends Error {},
@@ -39,7 +40,7 @@ vi.mock("../src/server/repositories/household.repository", () => ({
 }));
 
 import { PermissionDeniedError } from "../src/server/auth/authorization";
-import { deleteGuest } from "../src/server/actions/guests/guest.actions";
+import { deleteGuest, updateGuest } from "../src/server/actions/guests/guest.actions";
 import {
   createHousehold,
   deleteHousehold,
@@ -62,6 +63,22 @@ describe("guest and household mutation authorization", () => {
       error: "You do not have permission to perform this action.",
     });
     expect(mocks.deleteGuest).not.toHaveBeenCalled();
+  });
+
+  it("keeps guest section assignment changes rejected for VIEWER users", async () => {
+    const result = await updateGuest(guestId, {
+      firstName: "Ada",
+      lastName: "Lovelace",
+      ageGroup: "ADULT",
+      sectionIds: [],
+      tagIds: [],
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "You do not have permission to perform this action.",
+    });
+    expect(mocks.updateGuest).not.toHaveBeenCalled();
   });
 
   it("keeps household deletion rejected for VIEWER users", async () => {

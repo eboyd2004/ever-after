@@ -88,7 +88,7 @@ export class WeddingSectionRepository {
         });
 
         return this.getOrderedSections(tx, weddingId);
-      }),
+      }, { isolationLevel: "Serializable" }),
     );
   }
 
@@ -250,11 +250,20 @@ export class WeddingSectionRepository {
           throw new WeddingSectionRepositoryError("Wedding day section not found.");
         }
 
+        const assignmentCount = await tx.guestSectionAssignment.count({
+          where: { sectionId },
+        });
+        if (assignmentCount > 0) {
+          throw new WeddingSectionRepositoryError(
+            "This section cannot be deleted while guests are assigned to it. Deactivate the section or remove its guest assignments first.",
+          );
+        }
+
         await tx.weddingSection.delete({ where: { id: sectionId } });
 
         const sections = await this.getOrderedSections(tx, weddingId);
         return this.normalizePositions(tx, sections);
-      }),
+      }, { isolationLevel: "Serializable" }),
     );
   }
 

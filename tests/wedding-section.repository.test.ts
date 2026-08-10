@@ -10,14 +10,16 @@ const mocks = vi.hoisted(() => {
     updateMany: vi.fn(),
     delete: vi.fn(),
   };
+  const guestSectionAssignment = { count: vi.fn() };
 
   return {
     prisma: {
       $transaction: vi.fn(),
       wedding: { create: vi.fn() },
       weddingSection,
+      guestSectionAssignment,
     },
-    tx: { weddingSection },
+    tx: { weddingSection, guestSectionAssignment },
   };
 });
 
@@ -69,6 +71,7 @@ describe("wedding section repository", () => {
     mocks.prisma.weddingSection.update.mockResolvedValue(makeSection());
     mocks.prisma.weddingSection.updateMany.mockResolvedValue({ count: 1 });
     mocks.prisma.weddingSection.delete.mockResolvedValue(makeSection());
+    mocks.prisma.guestSectionAssignment.count.mockResolvedValue(0);
   });
 
   it("creates Ceremony and Venue transactionally with a new wedding", async () => {
@@ -257,5 +260,30 @@ describe("wedding section repository", () => {
       data: { position: 0 },
     });
     expect(result.map((section) => section.position)).toEqual([0]);
+  });
+
+  it("blocks deletion while guests are assigned", async () => {
+    mocks.prisma.weddingSection.findFirst.mockResolvedValue({ id: "section_1" });
+    mocks.prisma.guestSectionAssignment.count.mockResolvedValue(1);
+
+    await expect(
+      weddingSectionRepository.deleteSection("wedding_1", "section_1"),
+    ).rejects.toThrow("guests are assigned");
+    expect(mocks.prisma.weddingSection.delete).not.toHaveBeenCalled();
+  });
+
+  it("allows deactivation without touching guest assignments", async () => {
+    mocks.prisma.weddingSection.updateMany.mockResolvedValue({ count: 1 });
+    mocks.prisma.weddingSection.findMany.mockResolvedValue([
+      makeSection({ active: false }),
+    ]);
+
+    await weddingSectionRepository.setActive("wedding_1", "section_1", false);
+
+    expect(mocks.prisma.weddingSection.updateMany).toHaveBeenCalledWith({
+      where: { id: "section_1", weddingId: "wedding_1" },
+      data: { active: false },
+    });
+    expect(mocks.prisma.guestSectionAssignment.count).not.toHaveBeenCalled();
   });
 });

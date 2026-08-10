@@ -243,6 +243,7 @@ function HouseholdMemberRow({
             <Badge tone={guest.ageGroup === "ADULT" ? "default" : "gold"}>{formatAgeGroup(guest.ageGroup)}</Badge>
             {guest.tags.map((tag) => <Badge key={tag.id} tone="success">{tag.name}</Badge>)}
           </span>
+          <SectionSummary sections={guest.sections} />
         </Link>
         {nested && canEdit ? (
           <div className="mt-3 flex flex-wrap items-center gap-3 text-xs font-semibold">
@@ -290,6 +291,7 @@ function StandaloneGuestRow({
             <Badge tone={guest.ageGroup === "ADULT" ? "default" : "gold"}>{formatAgeGroup(guest.ageGroup)}</Badge>
             {guest.tags.map((tag) => <Badge key={tag.id} tone="success">{tag.name}</Badge>)}
           </span>
+          <SectionSummary sections={guest.sections} />
         </Link>
         {nested && canEdit ? (
           <div className="mt-3 flex flex-wrap items-center gap-3 text-xs font-semibold">
@@ -303,6 +305,21 @@ function StandaloneGuestRow({
         {!guest.email && !guest.phone ? <span className="text-[#A5A39A]">No contact details</span> : null}
       </span>
     </div>
+  );
+}
+
+function SectionSummary({
+  sections,
+}: {
+  sections: { id: string; name: string; active: boolean }[];
+}) {
+  return (
+    <span className="mt-2 block text-xs text-[#6B6B63]">
+      <span className="font-medium text-[#8A8A82]">Sections:</span>{" "}
+      {sections.length > 0
+        ? sections.map((section) => `${section.name}${section.active ? "" : " (inactive)"}`).join(", ")
+        : "—"}
+    </span>
   );
 }
 

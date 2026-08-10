@@ -15,4 +15,21 @@ describe("WeddingSection deletion cascade", () => {
       'ALTER TABLE "wedding_sections" ADD CONSTRAINT "wedding_sections_wedding_id_fkey" FOREIGN KEY ("wedding_id") REFERENCES "weddings"("id") ON DELETE CASCADE',
     );
   });
+
+  it("cascades guest deletion to section assignments and keeps section deletion safe", () => {
+    const migration = readFileSync(
+      new URL(
+        "../prisma/migrations/20260810100000_add_guest_section_assignments/migration.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+
+    expect(migration).toContain(
+      'FOREIGN KEY ("guest_id") REFERENCES "guests"("id") ON DELETE CASCADE',
+    );
+    expect(migration).toContain(
+      'FOREIGN KEY ("section_id") REFERENCES "wedding_sections"("id") ON DELETE CASCADE',
+    );
+  });
 });

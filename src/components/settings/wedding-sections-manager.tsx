@@ -353,7 +353,7 @@ export function WeddingSectionsManager({
 
       <ConfirmDialog
         confirmLabel="Delete section"
-        description="This section is not linked to invitations yet, so it can be safely deleted. This cannot be undone."
+        description="A section with guest assignments cannot be deleted. Deactivate it or remove guest assignments first. This cannot be undone."
         onClose={() => setDeleteId(null)}
         onConfirm={deleteSection}
         open={deleteId !== null}

@@ -10,6 +10,7 @@ import { WeddingRequiredState } from "@/src/components/shared/wedding-required-s
 import { getGuests } from "@/src/server/actions/guests/guest.actions";
 import { getHousehold } from "@/src/server/actions/guests/household.actions";
 import { getGuestTags } from "@/src/server/actions/guests/guest-tag.actions";
+import { getWeddingSections } from "@/src/server/actions/settings/wedding-section.actions";
 import { getWeddingPageContext } from "@/src/server/auth/get-wedding-page-context";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ export default async function HouseholdDetailPage({
   const householdResult = await getHousehold(householdId);
   const guestsResult = await getGuests({ unassignedHousehold: true });
   const tagsResult = await getGuestTags();
+  const sectionsResult = await getWeddingSections();
 
   if (!householdResult.success) {
     return <HouseholdError message={householdResult.error} />;
@@ -38,9 +40,12 @@ export default async function HouseholdDetailPage({
   if (!tagsResult.success) {
     return <HouseholdError message={tagsResult.error} />;
   }
+  if (!sectionsResult.success) {
+    return <HouseholdError message={sectionsResult.error} />;
+  }
 
   const household = householdResult.data;
-  const unassignedGuests = guestsResult.data;
+  const guestsWithoutHousehold = guestsResult.data;
   const canEdit = context.role !== "VIEWER";
 
   return (
@@ -58,6 +63,7 @@ export default async function HouseholdDetailPage({
                 households={[{ id: household.id, name: household.name }]}
                 lockedHouseholdId={household.id}
                 tags={tagsResult.data}
+                sections={sectionsResult.data.filter((section) => section.active)}
               />
             ) : null}
           </>
@@ -89,7 +95,7 @@ export default async function HouseholdDetailPage({
         </Card>
 
         <Card className="p-5 sm:p-6">
-          <HouseholdMembers canEdit={canEdit} household={household} unassignedGuests={unassignedGuests} />
+          <HouseholdMembers canEdit={canEdit} household={household} guestsWithoutHousehold={guestsWithoutHousehold} />
         </Card>
       </section>
 

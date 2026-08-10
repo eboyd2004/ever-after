@@ -35,6 +35,7 @@ export type CreateGuestWithPlusOneInput = {
   primary: GuestInput;
   plusOne: GuestInput | null;
   primaryTagIds: string[];
+  primarySectionIds?: string[];
 };
 
 export type PlusOneInput = Omit<GuestInput, "householdId" | "plusOneForGuestId">;
@@ -61,12 +62,38 @@ const guestInclude = {
         include: { tag: true },
         orderBy: { tag: { name: "asc" } },
       },
+      sectionAssignments: {
+        include: {
+          section: {
+            select: {
+              id: true,
+              name: true,
+              active: true,
+              position: true,
+            },
+          },
+        },
+        orderBy: { section: { position: "asc" } },
+      },
     },
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
   },
   tagAssignments: {
     include: { tag: true },
     orderBy: { tag: { name: "asc" } },
+  },
+  sectionAssignments: {
+    include: {
+      section: {
+        select: {
+          id: true,
+          name: true,
+          active: true,
+          position: true,
+        },
+      },
+    },
+    orderBy: { section: { position: "asc" } },
   },
 } satisfies Prisma.GuestInclude;
 
@@ -100,6 +127,48 @@ function throwPlusOneConflict(error: unknown): never | void {
 }
 
 export class GuestRepository {
+  private async validateSectionIds(
+    db: GuestDb,
+    weddingId: string,
+    sectionIds: string[],
+    existingSectionIds: ReadonlySet<string> = new Set(),
+  ) {
+    const uniqueSectionIds = [...new Set(sectionIds)];
+    if (uniqueSectionIds.length === 0) return uniqueSectionIds;
+
+    const sections = await db.weddingSection.findMany({
+      where: { id: { in: uniqueSectionIds }, weddingId },
+      select: { id: true, active: true },
+    });
+
+    if (sections.length !== uniqueSectionIds.length) {
+      throw new GuestRepositoryError(
+        "One or more wedding sections were not found in this wedding",
+      );
+    }
+
+    if (sections.some((section) => !section.active && !existingSectionIds.has(section.id))) {
+      throw new GuestRepositoryError(
+        "Inactive wedding sections cannot be newly assigned",
+      );
+    }
+
+    return uniqueSectionIds;
+  }
+
+  private async replaceGuestSectionAssignments(
+    tx: Prisma.TransactionClient,
+    guestId: string,
+    sectionIds: string[],
+  ) {
+    await tx.guestSectionAssignment.deleteMany({ where: { guestId } });
+    if (sectionIds.length > 0) {
+      await tx.guestSectionAssignment.createMany({
+        data: sectionIds.map((sectionId) => ({ guestId, sectionId })),
+      });
+    }
+  }
+
   private buildGuestWhere(
     weddingId: string,
     filters: GuestFilters = {},
@@ -392,12 +461,33 @@ export class GuestRepository {
     }
   }
 
-  async createGuest(weddingId: string, input: GuestInput) {
+  async createGuest(
+    weddingId: string,
+    input: GuestInput,
+    sectionIds: string[] = [],
+  ) {
     try {
       return await prisma.$transaction(async (tx) => {
         await this.validateGuestReferences(tx, weddingId, input);
-        return tx.guest.create({
+        const validSectionIds = await this.validateSectionIds(
+          tx,
+          weddingId,
+          sectionIds,
+        );
+        const guest = await tx.guest.create({
           data: { weddingId, ...input },
+          include: guestInclude,
+        });
+        if (validSectionIds.length > 0) {
+          await tx.guestSectionAssignment.createMany({
+            data: validSectionIds.map((sectionId) => ({
+              guestId: guest.id,
+              sectionId,
+            })),
+          });
+        }
+        return tx.guest.findFirst({
+          where: { id: guest.id, weddingId },
           include: guestInclude,
         });
       }, { isolationLevel: "Serializable" });
@@ -432,6 +522,11 @@ export class GuestRepository {
 
       await prisma.$transaction(async (tx) => {
         await this.validateGuestReferences(tx, weddingId, input.primary);
+        const sectionIds = await this.validateSectionIds(
+          tx,
+          weddingId,
+          input.primarySectionIds ?? [],
+        );
 
         const tagIds = [...new Set(input.primaryTagIds)];
         const tagCount = await tx.guestTag.count({
@@ -453,6 +548,14 @@ export class GuestRepository {
         if (tagIds.length > 0) {
           await tx.guestTagAssignment.createMany({
             data: tagIds.map((tagId) => ({ guestId: primaryId, tagId })),
+          });
+        }
+        if (sectionIds.length > 0) {
+          await tx.guestSectionAssignment.createMany({
+            data: sectionIds.map((sectionId) => ({
+              guestId: primaryId,
+              sectionId,
+            })),
           });
         }
       }, { isolationLevel: "Serializable" });
@@ -614,6 +717,7 @@ export class GuestRepository {
     guestId: string,
     input: GuestInput,
     tagIds?: string[],
+    sectionIds?: string[],
   ) {
     try {
       const guestData = { ...input };
@@ -656,6 +760,24 @@ export class GuestRepository {
           }
         }
 
+        if (sectionIds !== undefined) {
+          const existingAssignments = await tx.guestSectionAssignment.findMany({
+            where: { guestId },
+            select: { sectionId: true },
+          });
+          const validSectionIds = await this.validateSectionIds(
+            tx,
+            weddingId,
+            sectionIds,
+            new Set(existingAssignments.map((assignment) => assignment.sectionId)),
+          );
+          await this.replaceGuestSectionAssignments(
+            tx,
+            guestId,
+            validSectionIds,
+          );
+        }
+
         await tx.guest.update({
           where: { id: guestId },
           data: { ...guestData, householdId },
@@ -691,6 +813,7 @@ export class GuestRepository {
           where: { weddingId, primaryGuestId: guestId },
           data: { primaryGuestId: null },
         });
+        await tx.guestSectionAssignment.deleteMany({ where: { guestId } });
         await tx.guest.delete({ where: { id: guestId } });
 
         if (guest.householdId) {
