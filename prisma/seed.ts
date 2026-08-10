@@ -271,9 +271,8 @@ const guestDefinitions = [
 ] as const;
 
 const weddingSectionDefinitions = [
-  { name: "Ceremony", description: "The ceremony and service details.", position: 0 },
-  { name: "Wedding Breakfast", description: "The main meal and reception programme.", position: 1 },
-  { name: "Evening Reception", description: "Evening celebrations and entertainment.", position: 2 },
+  { name: "Ceremony", description: null, position: 0 },
+  { name: "Venue", description: null, position: 1 },
 ] as const;
 
 function dateOnly(value: string) {
@@ -482,26 +481,22 @@ async function main() {
       tags.set(definition.name, tag);
     }
 
-    for (const definition of weddingSectionDefinitions) {
-      await prisma.weddingSection.upsert({
-        where: {
-          weddingId_name: {
-            weddingId: wedding.id,
-            name: definition.name,
-          },
-        },
-        update: {
-          description: definition.description,
-          position: definition.position,
-          active: true,
-        },
-        create: {
+    const existingSectionCount = await prisma.weddingSection.count({
+      where: { weddingId: wedding.id },
+    });
+
+    // Seed only an empty wedding. Once a wedding has any section data, it is
+    // user-owned and must not be renamed, reordered, reactivated, or removed
+    // by a later development seed run.
+    if (existingSectionCount === 0) {
+      await prisma.weddingSection.createMany({
+        data: weddingSectionDefinitions.map((definition) => ({
           weddingId: wedding.id,
           name: definition.name,
           description: definition.description,
           position: definition.position,
           active: true,
-        },
+        })),
       });
     }
 
