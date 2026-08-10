@@ -56,6 +56,7 @@ export type GuestActionData = {
   plusOneFor: GuestNameActionData | null;
   plusOnes: GuestPlusOneActionData[];
   tags: GuestTagActionData[];
+  sections: GuestSectionActionData[];
 };
 
 export type GuestNameActionData = {
@@ -73,6 +74,13 @@ export type GuestPlusOneActionData = {
   phone: string | null;
   ageGroup: GuestAgeGroup;
   tags: GuestTagActionData[];
+  sections: GuestSectionActionData[];
+};
+
+export type GuestSectionActionData = {
+  id: string;
+  name: string;
+  active: boolean;
 };
 
 export type HouseholdActionData = {
@@ -155,11 +163,21 @@ function mapGuest(guest: GuestRecord): GuestActionData {
         name: tag.name,
         colour: tag.colour,
       })),
+      sections: plusOne.sectionAssignments.map(({ section }) => ({
+        id: section.id,
+        name: section.name,
+        active: section.active,
+      })),
     })),
     tags: guest.tagAssignments.map(({ tag }) => ({
       id: tag.id,
       name: tag.name,
       colour: tag.colour,
+    })),
+    sections: guest.sectionAssignments.map(({ section }) => ({
+      id: section.id,
+      name: section.name,
+      active: section.active,
     })),
   };
 }
@@ -169,7 +187,7 @@ function mapGuestList(guests: GuestRecord[]) {
 }
 
 function mapGuestInput(input: unknown):
-  | { value: GuestInput & { tagIds: string[] } }
+  | { value: GuestInput & { tagIds: string[]; sectionIds: string[] } }
   | { error: string } {
   const record = parseRecord(input);
   if ("error" in record) return record;
@@ -210,6 +228,15 @@ function mapGuestInput(input: unknown):
     : [{ error: "Tags are invalid" }];
   const tagError = tagIds.find((result) => "error" in result);
 
+  const sectionIdsValue = record.value.sectionIds ?? [];
+  const sectionIds = Array.isArray(sectionIdsValue)
+    ? sectionIdsValue.map((sectionId) => parseId(sectionId, "Wedding section"))
+    : [{ error: "Wedding sections are invalid" }];
+  const sectionError = sectionIds.find((result) => "error" in result);
+  if (!sectionError && new Set(sectionIds.map((sectionId) => parsedValue(sectionId))).size !== sectionIds.length) {
+    return { error: "A wedding section cannot be selected more than once" };
+  }
+
   const error = firstError(
     firstName,
     lastName,
@@ -222,6 +249,7 @@ function mapGuestInput(input: unknown):
     plusOneForGuestId,
     ageGroup,
     tagError ?? {},
+    sectionError ?? {},
   );
 
   if (error) return { error };
@@ -239,6 +267,7 @@ function mapGuestInput(input: unknown):
       plusOneForGuestId: parsedValue(plusOneForGuestId) as string | null,
       ageGroup: parsedValue(ageGroup) as GuestAgeGroup,
       tagIds: tagIds.map((tagId) => parsedValue(tagId) as string),
+      sectionIds: sectionIds.map((sectionId) => parsedValue(sectionId) as string),
     },
   };
 }
@@ -423,11 +452,12 @@ export async function createGuest(
   if ("error" in plusOne) return failure(plusOne.error);
 
   return runGuestAction("create guest", "edit", async (weddingId) => {
-    const { tagIds, ...guestInput } = parsed.value;
+    const { tagIds, sectionIds, ...guestInput } = parsed.value;
     const guest = await guestRepository.createGuestWithPlusOne(weddingId, {
       primary: guestInput,
       plusOne: parsedValue(plusOne),
       primaryTagIds: tagIds,
+      primarySectionIds: sectionIds,
     });
     revalidateGuestPaths(guest.id);
     return mapGuest(guest);
@@ -487,14 +517,18 @@ export async function updateGuest(
   if ("error" in parsedId) return failure(parsedId.error);
   const parsed = mapGuestInput(input);
   if ("error" in parsed) return failure(parsed.error);
+  const record = parseRecord(input);
+  if ("error" in record) return failure(record.error);
 
   return runGuestAction("update guest", "edit", async (weddingId) => {
-    const { tagIds, ...guestInput } = parsed.value;
+    const { tagIds, sectionIds: parsedSectionIds, ...guestInput } = parsed.value;
+    const sectionIds = "sectionIds" in record.value ? parsedSectionIds : undefined;
     const guest = await guestRepository.updateGuest(
       weddingId,
       parsedValue(parsedId),
       guestInput,
       tagIds,
+      sectionIds,
     );
     revalidateGuestPaths(guest.id);
     return mapGuest(guest);

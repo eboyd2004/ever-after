@@ -26,6 +26,9 @@ const mocks = vi.hoisted(() => ({
       deleteMany: vi.fn(),
       createMany: vi.fn(),
     },
+    guestSectionAssignment: {
+      deleteMany: vi.fn(),
+    },
   },
 }));
 
@@ -81,6 +84,7 @@ beforeEach(() => {
   mocks.prisma.guest.updateMany.mockResolvedValue({ count: 1 });
   mocks.prisma.guestTagAssignment.deleteMany.mockResolvedValue({ count: 0 });
   mocks.prisma.guestTagAssignment.createMany.mockResolvedValue({ count: 1 });
+  mocks.prisma.guestSectionAssignment.deleteMany.mockResolvedValue({ count: 1 });
   mocks.prisma.household.updateMany.mockResolvedValue({ count: 1 });
   mocks.prisma.household.update.mockResolvedValue({});
 });
@@ -100,6 +104,9 @@ describe("household primary integrity", () => {
 
     expect(mocks.prisma.guest.delete).toHaveBeenCalledWith({
       where: { id: "guest_primary" },
+    });
+    expect(mocks.prisma.guestSectionAssignment.deleteMany).toHaveBeenCalledWith({
+      where: { guestId: "guest_primary" },
     });
     expect(mocks.prisma.household.update).toHaveBeenCalledWith({
       where: { id: householdId },

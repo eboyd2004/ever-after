@@ -6,6 +6,7 @@ import {
 } from "../../../app/generated/prisma/client";
 import { prisma } from "../db/prisma";
 import { logger } from "../logging/logger";
+import { DEFAULT_WEDDING_SECTION_DEFINITIONS } from "./wedding-section.repository";
 
 export type CreateWeddingRepositoryInput = {
   userId: string;
@@ -157,6 +158,14 @@ export class WeddingRepository {
               status: MembershipStatus.ACTIVE,
               joinedAt: new Date(),
             },
+          },
+          weddingSections: {
+            create: DEFAULT_WEDDING_SECTION_DEFINITIONS.map((definition) => ({
+              name: definition.name,
+              description: definition.description,
+              position: definition.position,
+              active: definition.active,
+            })),
           },
         },
         include: { members: true },

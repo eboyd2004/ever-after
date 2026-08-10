@@ -246,11 +246,13 @@ model Guest {
   plusOneFor          Guest?               @relation("GuestPlusOne", fields: [plusOneForGuestId], references: [id], onDelete: SetNull)
   plusOnes            Guest[]              @relation("GuestPlusOne")
   tagAssignments      GuestTagAssignment[] @relation("GuestTagAssignments")
+  sectionAssignments  GuestSectionAssignment[] @relation("GuestSectionAssignments")
 
   @@unique([plusOneForGuestId], map: "guests_plus_one_for_guest_id_key")
   // Service-level validation must ensure household and plus-one target belong
   // to this Guest's Wedding; tag assignments must also use this Wedding's
-  // tags. Prisma cannot enforce these cross-record rules across foreign keys.
+  // tags, and section assignments must use this Wedding's sections. Prisma
+  // cannot enforce these cross-record rules across foreign keys.
   @@index([weddingId], map: "guests_wedding_id_idx")
   @@index([householdId], map: "guests_household_id_idx")
   @@index([lastName], map: "guests_last_name_idx")
@@ -290,6 +292,19 @@ model GuestTagAssignment {
   @@map("guest_tag_assignments")
 }
 
+model GuestSectionAssignment {
+  guestId   String   @map("guest_id") @db.Uuid
+  sectionId String   @map("section_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  guest   Guest         @relation("GuestSectionAssignments", fields: [guestId], references: [id], onDelete: Cascade)
+  section WeddingSection @relation("WeddingSectionGuestAssignments", fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@id([guestId, sectionId])
+  @@index([sectionId], map: "guest_section_assignments_section_id_idx")
+  @@map("guest_section_assignments")
+}
+
 model WeddingSection {
   id          String   @id @default(uuid()) @db.Uuid
   weddingId   String   @map("wedding_id") @db.Uuid
@@ -300,7 +315,8 @@ model WeddingSection {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  wedding Wedding @relation("WeddingSections", fields: [weddingId], references: [id], onDelete: Cascade)
+  wedding          Wedding                  @relation("WeddingSections", fields: [weddingId], references: [id], onDelete: Cascade)
+  guestAssignments GuestSectionAssignment[] @relation("WeddingSectionGuestAssignments")
 
   @@unique([weddingId, name], map: "wedding_sections_wedding_id_name_key")
   @@index([weddingId], map: "wedding_sections_wedding_id_idx")

@@ -6,6 +6,7 @@ import { GuestTagManager } from "@/src/components/guests/guest-tag-manager";
 import { GuestTable } from "@/src/components/guests/guest-table";
 import { WeddingRequiredState } from "@/src/components/shared/wedding-required-state";
 import { getWeddingPageContext } from "@/src/server/auth/get-wedding-page-context";
+import { getWeddingSections } from "@/src/server/actions/settings/wedding-section.actions";
 import {
   guestListRepository,
   GuestListRepositoryError,
@@ -35,17 +36,15 @@ export default async function GuestsPage({
   }
   const params = (await searchParams) ?? {};
   const search = firstParam(params.search);
-  const householdId = firstParam(params.householdId);
   const ageGroup = firstParam(params.ageGroup);
   const tagId = firstParam(params.tagId);
-  const unassignedHousehold = firstParam(params.unassignedHousehold) === "true";
+  const sectionId = firstParam(params.sectionId);
 
   const parsedFilters = parseGuestListFilters({
     search,
-    householdId,
     ageGroup,
     tagId,
-    unassignedHousehold,
+    sectionId,
   });
 
   if ("error" in parsedFilters) {
@@ -65,10 +64,16 @@ export default async function GuestsPage({
     return <GuestPageError message={message} />;
   }
 
+  const sectionsResult = await getWeddingSections();
+  if (!sectionsResult.success) {
+    return <GuestPageError message={sectionsResult.error} />;
+  }
+
   const { standaloneGuests, households, tags } = guestList;
+  const activeSections = sectionsResult.data.filter((section) => section.active);
   const householdGuests = households.flatMap((household) => household.guests);
   const totalGuestCount = standaloneGuests.length + householdGuests.length;
-  const unassignedCount = standaloneGuests.length;
+  const withoutHouseholdCount = standaloneGuests.length;
   const childCount = [...standaloneGuests, ...householdGuests].filter((guest) => guest.ageGroup === "CHILD").length;
   const infantCount = [...standaloneGuests, ...householdGuests].filter((guest) => guest.ageGroup === "INFANT").length;
   const canEdit = context.role !== "VIEWER";
@@ -89,7 +94,7 @@ export default async function GuestsPage({
               Households
             </Link>
             {canEdit ? (
-              <GuestCreationTrigger households={households} tags={tags} />
+              <GuestCreationTrigger households={households} sections={activeSections} tags={tags} />
             ) : null}
           </>
         }
@@ -98,7 +103,7 @@ export default async function GuestsPage({
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard label="Total guests" value={totalGuestCount} icon="users" />
         <SummaryCard label="Households" value={households.length} icon="users" />
-        <SummaryCard label="Unassigned" value={unassignedCount} icon="pin" tone={unassignedCount > 0 ? "warning" : "success"} />
+        <SummaryCard label="No household" value={withoutHouseholdCount} icon="pin" />
         <SummaryCard label="Children & infants" value={childCount + infantCount} icon="heart" />
       </section>
 
@@ -109,12 +114,11 @@ export default async function GuestsPage({
         </div>
         <GuestFilters
           ageGroup={ageGroup}
-          householdId={householdId}
-          households={households}
           search={search}
+          sectionId={sectionId}
+          sections={activeSections}
           tagId={tagId}
           tags={tags}
-          unassignedHousehold={unassignedHousehold}
         />
         <div className="mt-4 border-t border-[#F0EFEA] pt-4">
           <GuestTagManager canEdit={canEdit} tags={tags} />
@@ -123,7 +127,7 @@ export default async function GuestsPage({
 
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold text-[#1C1C1C]">Invitation units</h2>
+          <h2 className="text-lg font-semibold text-[#1C1C1C]">Guest list</h2>
           <p className="mt-1 text-sm text-[#8A8A82]">
             {households.length} {households.length === 1 ? "household" : "households"} and {standaloneGuests.length} standalone {standaloneGuests.length === 1 ? "guest" : "guests"} matching the current view.
           </p>
@@ -134,7 +138,7 @@ export default async function GuestsPage({
       <GuestTable
         canEdit={canEdit}
         households={households}
-        key={`${search ?? ""}-${householdId ?? ""}-${ageGroup ?? ""}-${tagId ?? ""}-${unassignedHousehold}`}
+        key={`${search ?? ""}-${sectionId ?? ""}-${ageGroup ?? ""}-${tagId ?? ""}`}
         search={search}
         standaloneGuests={standaloneGuests}
       />

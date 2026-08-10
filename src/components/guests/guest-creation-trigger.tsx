@@ -3,18 +3,23 @@
 import { useState } from "react";
 
 import type { HouseholdData } from "@/src/server/actions/guests/household.actions";
-import type { GuestListTag } from "@/src/server/repositories/guest-list.repository";
+import type {
+  GuestListSection,
+  GuestListTag,
+} from "@/src/server/repositories/guest-list.repository";
 import { Button } from "@/src/components/shared/ui";
 import { Icon } from "@/src/components/shared/icons";
 import { GuestCreationModal } from "./guest-creation-modal";
 
 export function GuestCreationTrigger({
   households,
+  sections,
   tags,
   buttonLabel = "Add guest",
   lockedHouseholdId,
 }: {
   households: Pick<HouseholdData, "id" | "name">[];
+  sections: GuestListSection[];
   tags: GuestListTag[];
   buttonLabel?: string;
   lockedHouseholdId?: string;
@@ -32,6 +37,7 @@ export function GuestCreationTrigger({
         lockedHouseholdId={lockedHouseholdId}
         onClose={() => setOpen(false)}
         open={open}
+        sections={sections}
         tags={tags}
       />
     </>

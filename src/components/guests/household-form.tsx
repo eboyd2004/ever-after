@@ -110,7 +110,7 @@ export function HouseholdForm({ household }: { household?: HouseholdData }) {
       {household ? (
         <ConfirmDialog
           confirmLabel="Delete household"
-          description="The household will be deleted, but its guests will remain in the wedding as unassigned guests."
+          description="The household will be deleted, but its guests will remain in the wedding without a household."
           onClose={() => setIsDeleteOpen(false)}
           onConfirm={remove}
           open={isDeleteOpen}

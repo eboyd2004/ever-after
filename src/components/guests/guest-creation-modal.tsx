@@ -5,9 +5,11 @@ import { FormEvent, useRef, useState, useTransition, type ReactNode } from "reac
 import { createGuest, type GuestActionResult, type GuestActionData } from "@/src/server/actions/guests/guest.actions";
 import type { HouseholdData } from "@/src/server/actions/guests/household.actions";
 import type { GuestListTag } from "@/src/server/repositories/guest-list.repository";
+import type { GuestListSection } from "@/src/server/repositories/guest-list.repository";
 import { Button, Input, Select } from "@/src/components/shared/ui";
 import { Modal } from "@/src/components/shared/modal";
 import { ConfirmDialog } from "@/src/components/shared/confirm-dialog";
+import { GuestSectionSelector } from "./guest-section-selector";
 
 type PlusOneDraft = {
   firstName: string;
@@ -33,12 +35,14 @@ export function GuestCreationModal({
   open,
   onClose,
   households,
+  sections,
   tags,
   lockedHouseholdId,
 }: {
   open: boolean;
   onClose: () => void;
   households: Pick<HouseholdData, "id" | "name">[];
+  sections: GuestListSection[];
   tags: GuestListTag[];
   lockedHouseholdId?: string;
 }) {
@@ -47,6 +51,7 @@ export function GuestCreationModal({
   const [error, setError] = useState<string | null>(null);
   const [plusOneOpen, setPlusOneOpen] = useState(false);
   const [plusOneDraft, setPlusOneDraft] = useState<PlusOneDraft>(emptyPlusOne);
+  const [selectedSections, setSelectedSections] = useState<string[]>([]);
   const [confirmation, setConfirmation] = useState<"close" | "collapse" | null>(null);
 
   function close() {
@@ -62,6 +67,7 @@ export function GuestCreationModal({
     setError(null);
     setPlusOneOpen(false);
     setPlusOneDraft(emptyPlusOne);
+    setSelectedSections([]);
     setConfirmation(null);
     onClose();
   }
@@ -108,6 +114,7 @@ export function GuestCreationModal({
         dietaryRequirements: formData.get("dietaryRequirements"),
         notes: formData.get("notes"),
         tagIds,
+        sectionIds: selectedSections,
         plusOne: plusOneOpen ? plusOneDraft : undefined,
       });
 
@@ -164,6 +171,11 @@ export function GuestCreationModal({
           <TextArea defaultValue="" label="Notes" name="notes" />
         </div>
         <TagFields tags={tags} />
+        <GuestSectionSelector
+          onChange={setSelectedSections}
+          sections={sections}
+          selectedSectionIds={selectedSections}
+        />
 
         <div className="rounded-xl border border-dashed border-[#C9DCC5] bg-[#F7FBF5] p-4">
           <button

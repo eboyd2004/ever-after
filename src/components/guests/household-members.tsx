@@ -17,11 +17,11 @@ import { ConfirmDialog } from "@/src/components/shared/confirm-dialog";
 
 export function HouseholdMembers({
   household,
-  unassignedGuests,
+  guestsWithoutHousehold,
   canEdit = true,
 }: {
   household: HouseholdData;
-  unassignedGuests: GuestActionData[];
+  guestsWithoutHousehold: GuestActionData[];
   canEdit?: boolean;
 }) {
   const router = useRouter();
@@ -133,17 +133,17 @@ export function HouseholdMembers({
         <p className="rounded-xl border border-dashed border-[#E4E0D4] px-4 py-6 text-sm text-[#8A8A82]">No guests are assigned to this household.</p>
       )}
 
-      {canEdit && unassignedGuests.length > 0 ? (
+      {canEdit && guestsWithoutHousehold.length > 0 ? (
         <form className="border-t border-[#F0EFEA] pt-5" onSubmit={addGuests}>
           <label className="grid gap-1.5 text-xs font-medium text-[#6B6B63]">
-            Add unassigned guests
+            Add guests without a household
             <Select
               multiple
               onChange={(event) => setSelectedGuestIds(Array.from(event.target.selectedOptions, (option) => option.value))}
-              size={Math.min(5, unassignedGuests.length)}
+              size={Math.min(5, guestsWithoutHousehold.length)}
               value={selectedGuestIds}
             >
-              {unassignedGuests.map((guest) => (
+              {guestsWithoutHousehold.map((guest) => (
                 <option key={guest.id} value={guest.id}>{guest.firstName} {guest.lastName}</option>
               ))}
             </Select>

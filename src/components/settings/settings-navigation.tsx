@@ -10,6 +10,7 @@ export const settingsNavigationItems = [
   { href: "/settings/account", label: "Account", icon: "settings" },
   { href: "/settings/general", label: "General", icon: "settings" },
   { href: "/settings/locations", label: "Locations", icon: "pin" },
+  { href: "/settings/sections", label: "Wedding Day Sections", icon: "calendar" },
   { href: "/settings/members", label: "Members", icon: "users" },
   { href: "/settings/invitations", label: "Workspace invitations", icon: "file" },
   { href: "/settings/preferences", label: "Preferences", icon: "settings" },

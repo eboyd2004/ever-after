@@ -3,6 +3,7 @@ import Link from "next/link";
 import { GuestForm } from "@/src/components/guests/guest-form";
 import { WeddingRequiredState } from "@/src/components/shared/wedding-required-state";
 import { getGuestTags } from "@/src/server/actions/guests/guest-tag.actions";
+import { getWeddingSections } from "@/src/server/actions/settings/wedding-section.actions";
 import { getGuest, getGuests } from "@/src/server/actions/guests/guest.actions";
 import { getHouseholds } from "@/src/server/actions/guests/household.actions";
 import { getWeddingPageContext } from "@/src/server/auth/get-wedding-page-context";
@@ -27,6 +28,7 @@ export default async function GuestDetailPage({
   const householdsResult = await getHouseholds();
   const tagsResult = await getGuestTags();
   const guestsResult = await getGuests();
+  const sectionsResult = await getWeddingSections();
 
   if (!guestResult.success) {
     return <GuestDetailError message={guestResult.error} />;
@@ -39,6 +41,9 @@ export default async function GuestDetailPage({
   }
   if (!guestsResult.success) {
     return <GuestDetailError message={guestsResult.error} />;
+  }
+  if (!sectionsResult.success) {
+    return <GuestDetailError message={sectionsResult.error} />;
   }
 
   const guest = guestResult.data;
@@ -79,7 +84,7 @@ export default async function GuestDetailPage({
               <h2 className="mt-1 text-xl font-semibold text-[#1C1C1C]">{guest.firstName} {guest.lastName}</h2>
               <div className="mt-2 flex flex-wrap gap-2">
                 <Badge tone={guest.ageGroup === "ADULT" ? "default" : "gold"}>{formatAgeGroup(guest.ageGroup)}</Badge>
-                {guest.household ? <Badge tone="success">{guest.household.name}</Badge> : <Badge>Unassigned household</Badge>}
+                {guest.household ? <Badge tone="success">{guest.household.name}</Badge> : <Badge>No household</Badge>}
               </div>
               {guest.plusOneFor ? (
                 <Link
@@ -114,6 +119,16 @@ export default async function GuestDetailPage({
               {guest.tags.length > 0 ? guest.tags.map((tag) => <Badge key={tag.id} tone="success">{tag.name}</Badge>) : <span className="text-xs text-[#A5A39A]">No tags</span>}
             </div>
           </div>
+          <div className="mt-6 border-t border-[#F0EFEA] pt-5">
+            <p className="text-xs font-medium text-[#6B6B63]">Wedding sections</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {guest.sections.length > 0 ? guest.sections.map((section) => (
+                <Badge key={section.id} tone={section.active ? "success" : "default"}>
+                  {section.name}{section.active ? "" : " · Inactive"}
+                </Badge>
+              )) : <span className="text-xs text-[#A5A39A]">No sections</span>}
+            </div>
+          </div>
         </Card>
 
         <Card className="p-5 sm:p-6">
@@ -138,6 +153,7 @@ export default async function GuestDetailPage({
             existingGuests={existingGuests}
             guest={guest}
             households={households}
+            sections={sectionsResult.data}
             tags={tags}
           />
         </Card>
