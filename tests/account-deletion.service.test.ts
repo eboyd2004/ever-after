@@ -1,5 +1,63 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const snapshot = {
+  user: {
+    id: "user_1",
+    authProviderId: "clerk_1",
+    email: "person@example.com",
+    firstName: "Person",
+    lastName: "Example",
+    profileImageUrl: null,
+    createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+  },
+  preference: {
+    id: "preference_1",
+    userId: "user_1",
+    activeWeddingId: "wedding_1",
+    theme: "light",
+    timezone: "Europe/London",
+    emailNotificationsEnabled: true,
+    taskNotificationsEnabled: true,
+    paymentNotificationsEnabled: false,
+    additionalPreferences: null,
+    createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+  },
+  memberships: [
+    {
+      id: "membership_1",
+      weddingId: "wedding_1",
+      userId: "user_1",
+      role: "EDITOR",
+      status: "ACTIVE",
+      joinedAt: new Date("2026-01-01T00:00:00.000Z"),
+      leftAt: null,
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    },
+  ],
+  sentInvitations: [
+    {
+      id: "invitation_1",
+      weddingId: "wedding_1",
+      invitedEmail: "invitee@example.com",
+      role: "EDITOR",
+      status: "PENDING",
+      tokenHash: "token-hash",
+      expiresAt: new Date("2026-02-01T00:00:00.000Z"),
+      invitedByUserId: "user_1",
+      acceptedByUserId: null,
+      acceptedAt: null,
+      revokedAt: null,
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    },
+  ],
+  acceptedInvitationIds: ["accepted_invitation_1"],
+  assignedTasks: [{ id: "task_1", assigneeId: "membership_1" }],
+};
+
 const mocks = vi.hoisted(() => ({
   clerkUserDelete: vi.fn(),
   clerkClient: vi.fn(),
@@ -10,13 +68,27 @@ const mocks = vi.hoisted(() => ({
     user: {
       findUnique: vi.fn(),
       delete: vi.fn(),
+      create: vi.fn(),
+    },
+    userPreference: {
+      findUnique: vi.fn(),
+      create: vi.fn(),
     },
     weddingMember: {
       findFirst: vi.fn(),
+      findMany: vi.fn(),
       deleteMany: vi.fn(),
+      createMany: vi.fn(),
     },
     weddingInvitation: {
+      findMany: vi.fn(),
       deleteMany: vi.fn(),
+      createMany: vi.fn(),
+      updateMany: vi.fn(),
+    },
+    task: {
+      findMany: vi.fn(),
+      updateMany: vi.fn(),
     },
   },
 }));
@@ -27,7 +99,7 @@ vi.mock("@clerk/nextjs/server", () => ({
 }));
 vi.mock("../src/server/db/prisma", () => ({ prisma: mocks.prisma }));
 vi.mock("../src/server/logging/logger", () => ({
-  logger: { error: vi.fn() },
+  logger: { error: vi.fn(), warn: vi.fn() },
 }));
 
 import {
@@ -41,38 +113,38 @@ describe("accountDeletionService", () => {
     mocks.prisma.$transaction.mockImplementation(async (callback) =>
       callback(mocks.tx),
     );
-    mocks.tx.user.findUnique.mockResolvedValue({ authProviderId: "clerk_1" });
+    mocks.tx.user.findUnique.mockResolvedValue(snapshot.user);
     mocks.tx.weddingMember.findFirst.mockResolvedValue(null);
-    mocks.tx.weddingInvitation.deleteMany.mockResolvedValue({ count: 2 });
+    mocks.tx.weddingMember.findMany.mockResolvedValue(snapshot.memberships);
+    mocks.tx.userPreference.findUnique.mockResolvedValue(snapshot.preference);
+    mocks.tx.weddingInvitation.findMany
+      .mockResolvedValueOnce(snapshot.sentInvitations)
+      .mockResolvedValueOnce(
+        snapshot.acceptedInvitationIds.map((id) => ({ id })),
+      );
+    mocks.tx.task.findMany.mockResolvedValue(snapshot.assignedTasks);
+    mocks.tx.weddingInvitation.deleteMany.mockResolvedValue({ count: 1 });
     mocks.tx.weddingMember.deleteMany.mockResolvedValue({ count: 1 });
     mocks.tx.user.delete.mockResolvedValue({ id: "user_1" });
+    mocks.tx.user.create.mockResolvedValue(snapshot.user);
+    mocks.tx.userPreference.create.mockResolvedValue(snapshot.preference);
+    mocks.tx.weddingMember.createMany.mockResolvedValue({ count: 1 });
+    mocks.tx.weddingInvitation.createMany.mockResolvedValue({ count: 1 });
+    mocks.tx.weddingInvitation.updateMany.mockResolvedValue({ count: 1 });
+    mocks.tx.task.updateMany.mockResolvedValue({ count: 1 });
     mocks.clerkUserDelete.mockResolvedValue({ id: "clerk_1", object: "user" });
     mocks.clerkClient.mockResolvedValue({
       users: { deleteUser: mocks.clerkUserDelete },
     });
   });
 
-  it("deletes memberships, sent invitations, the application user, and Clerk user in one transaction", async () => {
+  it("commits local deletion before deleting the Clerk user", async () => {
     const order: string[] = [];
-    mocks.tx.user.findUnique.mockImplementation(async () => {
-      order.push("verify");
-      return { authProviderId: "clerk_1" };
-    });
-    mocks.tx.weddingMember.findFirst.mockImplementation(async () => {
-      order.push("ownership");
-      return null;
-    });
-    mocks.tx.weddingInvitation.deleteMany.mockImplementation(async () => {
-      order.push("invitations");
-      return { count: 2 };
-    });
-    mocks.tx.weddingMember.deleteMany.mockImplementation(async () => {
-      order.push("memberships");
-      return { count: 1 };
-    });
-    mocks.tx.user.delete.mockImplementation(async () => {
-      order.push("applicationUser");
-      return { id: "user_1" };
+    mocks.prisma.$transaction.mockImplementation(async (callback) => {
+      order.push("transaction started");
+      const result = await callback(mocks.tx);
+      order.push("transaction committed");
+      return result;
     });
     mocks.clerkUserDelete.mockImplementation(async () => {
       order.push("clerk");
@@ -85,11 +157,8 @@ describe("accountDeletionService", () => {
     });
 
     expect(order).toEqual([
-      "verify",
-      "ownership",
-      "invitations",
-      "memberships",
-      "applicationUser",
+      "transaction started",
+      "transaction committed",
       "clerk",
     ]);
     expect(mocks.prisma.$transaction).toHaveBeenCalledOnce();
@@ -103,6 +172,20 @@ describe("accountDeletionService", () => {
       where: { id: "user_1" },
     });
     expect(mocks.clerkUserDelete).toHaveBeenCalledWith("clerk_1");
+  });
+
+  it("does not call Clerk when local database deletion fails", async () => {
+    mocks.prisma.$transaction.mockRejectedValue(new Error("database offline"));
+
+    await expect(
+      accountDeletionService.deleteAccount({
+        userId: "user_1",
+        clerkUserId: "clerk_1",
+      }),
+    ).rejects.toThrow("Unable to delete your account. Please try again.");
+
+    expect(mocks.clerkUserDelete).not.toHaveBeenCalled();
+    expect(mocks.prisma.$transaction).toHaveBeenCalledOnce();
   });
 
   it("blocks deletion when the user owns an active wedding", async () => {
@@ -124,7 +207,10 @@ describe("accountDeletionService", () => {
   });
 
   it("rejects a mismatched local Clerk identity", async () => {
-    mocks.tx.user.findUnique.mockResolvedValue({ authProviderId: "another_clerk_user" });
+    mocks.tx.user.findUnique.mockResolvedValue({
+      ...snapshot.user,
+      authProviderId: "another_clerk_user",
+    });
 
     await expect(
       accountDeletionService.deleteAccount({
@@ -137,16 +223,7 @@ describe("accountDeletionService", () => {
     expect(mocks.clerkUserDelete).not.toHaveBeenCalled();
   });
 
-  it("rolls back the application transaction when Clerk deletion fails", async () => {
-    let transactionRejected = false;
-    mocks.prisma.$transaction.mockImplementation(async (callback) => {
-      try {
-        return await callback(mocks.tx);
-      } catch (error) {
-        transactionRejected = true;
-        throw error;
-      }
-    });
+  it("restores the local account when Clerk deletion fails after commit", async () => {
     mocks.clerkUserDelete.mockRejectedValue(new Error("Clerk unavailable"));
 
     await expect(
@@ -155,10 +232,41 @@ describe("accountDeletionService", () => {
         clerkUserId: "clerk_1",
       }),
     ).rejects.toThrow(
-      "Unable to delete your authentication account. No application data was deleted.",
+      "Your application account was restored, so you can safely try again later.",
     );
 
-    expect(transactionRejected).toBe(true);
-    expect(mocks.tx.user.delete).toHaveBeenCalledOnce();
+    expect(mocks.prisma.$transaction).toHaveBeenCalledTimes(2);
+    expect(mocks.tx.user.create).toHaveBeenCalledWith({ data: snapshot.user });
+    expect(mocks.tx.weddingMember.createMany).toHaveBeenCalledWith({
+      data: snapshot.memberships,
+    });
+    expect(mocks.tx.weddingInvitation.createMany).toHaveBeenCalledWith({
+      data: snapshot.sentInvitations,
+    });
+    expect(mocks.tx.userPreference.create).toHaveBeenCalled();
+    expect(mocks.tx.weddingInvitation.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: snapshot.acceptedInvitationIds } },
+      data: { acceptedByUserId: "user_1" },
+    });
+    expect(mocks.tx.task.updateMany).toHaveBeenCalledWith({
+      where: { id: "task_1" },
+      data: { assigneeId: "membership_1" },
+    });
+  });
+
+  it("returns a support-style error when local recovery also fails", async () => {
+    mocks.clerkUserDelete.mockRejectedValue(new Error("Clerk unavailable"));
+    mocks.tx.user.create.mockRejectedValue(new Error("database unavailable"));
+
+    await expect(
+      accountDeletionService.deleteAccount({
+        userId: "user_1",
+        clerkUserId: "clerk_1",
+      }),
+    ).rejects.toThrow(
+      "We couldn't complete account deletion safely. Please contact support before trying again.",
+    );
+
+    expect(mocks.prisma.$transaction).toHaveBeenCalledTimes(2);
   });
 });

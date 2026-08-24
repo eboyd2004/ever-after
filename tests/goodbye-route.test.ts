@@ -10,6 +10,8 @@ describe("goodbye route", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/html");
     expect(body).toContain("Your account has been deleted");
+    expect(body).toContain("Tied Forever");
+    expect(body).not.toContain("Ever After");
     expect(body).toContain('href="/"');
     expect(body).toContain('href="/sign-in"');
   });

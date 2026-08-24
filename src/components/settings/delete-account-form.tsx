@@ -34,7 +34,7 @@ export function DeleteAccountForm() {
   return (
     <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
       <p className="text-sm leading-6 text-[#7A4A43]">
-        This permanently deletes your Ever After account, removes your access
+        This permanently deletes your Tied Forever account, removes your access
         to every wedding, and cannot be undone. Weddings you only belong to
         will remain for their other members. Accounts that own a wedding must
         delete those weddings or arrange ownership transfer first.

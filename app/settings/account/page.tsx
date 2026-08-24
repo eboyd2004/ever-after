@@ -32,7 +32,7 @@ export default async function AccountSettingsPage() {
           Account
         </h1>
         <p className="mt-2 max-w-2xl text-[13.5px] leading-6 text-[#7A7A6E]">
-          Manage your Ever After account and permanent account deletion.
+          Manage your Tied Forever account and permanent account deletion.
         </p>
       </header>
 

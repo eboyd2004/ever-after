@@ -72,4 +72,15 @@ describe("deleteMyAccount", () => {
 
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
+
+  it("does not expose unexpected deletion errors to the user", async () => {
+    mocks.deleteAccount.mockRejectedValue(
+      new Error("internal Clerk or Prisma details"),
+    );
+
+    await expect(deleteMyAccount("DELETE")).resolves.toEqual({
+      success: false,
+      error: "Unable to delete your account. Please try again.",
+    });
+  });
 });

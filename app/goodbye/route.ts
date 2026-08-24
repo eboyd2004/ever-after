@@ -3,7 +3,7 @@ const goodbyePage = `<!doctype html>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Account deleted · Ever After</title>
+    <title>Account deleted · Tied Forever</title>
     <style>
       :root { color-scheme: light; font-family: Arial, sans-serif; background: #fafaf8; color: #1c1c1c; }
       body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 20px; box-sizing: border-box; }
@@ -21,9 +21,9 @@ const goodbyePage = `<!doctype html>
   <body>
     <main>
       <div class="mark" aria-hidden="true">✦</div>
-      <p class="eyebrow">Ever After</p>
+      <p class="eyebrow">Tied Forever</p>
       <h1>Your account has been deleted</h1>
-      <p>Your Ever After account and access have been permanently removed.</p>
+      <p>Your Tied Forever account and access have been permanently removed.</p>
       <nav>
         <a href="/">Return home</a>
         <a href="/sign-in">Sign in</a>
