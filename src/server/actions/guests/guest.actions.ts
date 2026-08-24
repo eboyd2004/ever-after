@@ -186,6 +186,27 @@ function mapGuestList(guests: GuestRecord[]) {
   return guests.map(mapGuest);
 }
 
+function parseSectionIds(
+  input: unknown,
+): { value: string[] } | { error: string } {
+  const sectionIdsValue = input ?? [];
+  const sectionIds = Array.isArray(sectionIdsValue)
+    ? sectionIdsValue.map((sectionId) => parseId(sectionId, "Wedding section"))
+    : [{ error: "Wedding sections are invalid" }];
+  const sectionError = sectionIds.find((result) => "error" in result);
+
+  if (sectionError && "error" in sectionError) {
+    return { error: sectionError.error };
+  }
+
+  const parsedSectionIds = sectionIds.map((sectionId) => parsedValue(sectionId));
+  if (new Set(parsedSectionIds).size !== parsedSectionIds.length) {
+    return { error: "A wedding section cannot be selected more than once" };
+  }
+
+  return { value: parsedSectionIds };
+}
+
 function mapGuestInput(input: unknown):
   | { value: GuestInput & { tagIds: string[]; sectionIds: string[] } }
   | { error: string } {
@@ -228,14 +249,7 @@ function mapGuestInput(input: unknown):
     : [{ error: "Tags are invalid" }];
   const tagError = tagIds.find((result) => "error" in result);
 
-  const sectionIdsValue = record.value.sectionIds ?? [];
-  const sectionIds = Array.isArray(sectionIdsValue)
-    ? sectionIdsValue.map((sectionId) => parseId(sectionId, "Wedding section"))
-    : [{ error: "Wedding sections are invalid" }];
-  const sectionError = sectionIds.find((result) => "error" in result);
-  if (!sectionError && new Set(sectionIds.map((sectionId) => parsedValue(sectionId))).size !== sectionIds.length) {
-    return { error: "A wedding section cannot be selected more than once" };
-  }
+  const sectionIds = parseSectionIds(record.value.sectionIds);
 
   const error = firstError(
     firstName,
@@ -249,7 +263,7 @@ function mapGuestInput(input: unknown):
     plusOneForGuestId,
     ageGroup,
     tagError ?? {},
-    sectionError ?? {},
+    sectionIds,
   );
 
   if (error) return { error };
@@ -267,18 +281,20 @@ function mapGuestInput(input: unknown):
       plusOneForGuestId: parsedValue(plusOneForGuestId) as string | null,
       ageGroup: parsedValue(ageGroup) as GuestAgeGroup,
       tagIds: tagIds.map((tagId) => parsedValue(tagId) as string),
-      sectionIds: sectionIds.map((sectionId) => parsedValue(sectionId) as string),
+      sectionIds: parsedValue(sectionIds),
     },
   };
 }
 
 function parseOptionalPlusOne(input: unknown):
-  | { value: GuestInput | null }
+  | { value: { input: PlusOneInput; sectionIds: string[] } | null }
   | { error: string } {
   if (input === undefined || input === null) return { value: null };
 
   const record = parseRecord(input);
   if ("error" in record) return record;
+  const sectionIds = parseSectionIds(record.value.sectionIds);
+  if ("error" in sectionIds) return sectionIds;
   const hasAnyValue = [
     record.value.firstName,
     record.value.lastName,
@@ -286,7 +302,8 @@ function parseOptionalPlusOne(input: unknown):
     record.value.phone,
     record.value.dietaryRequirements,
     record.value.notes,
-  ].some((value) => typeof value === "string" && value.trim().length > 0);
+  ].some((value) => typeof value === "string" && value.trim().length > 0) ||
+    sectionIds.value.length > 0;
 
   if (!hasAnyValue) return { value: null };
 
@@ -313,22 +330,24 @@ function parseOptionalPlusOne(input: unknown):
     ageGroup,
     dietaryRequirements,
     notes,
+    sectionIds,
   );
 
   if (error) return { error };
 
   return {
     value: {
-      firstName: parsedValue(firstName) as string,
-      lastName: parsedValue(lastName) as string,
-      title: null,
-      email: parsedValue(email) as string | null,
-      phone: parsedValue(phone) as string | null,
-      ageGroup: parsedValue(ageGroup) as GuestAgeGroup,
-      dietaryRequirements: parsedValue(dietaryRequirements) as string | null,
-      notes: parsedValue(notes) as string | null,
-      householdId: null,
-      plusOneForGuestId: null,
+      input: {
+        firstName: parsedValue(firstName) as string,
+        lastName: parsedValue(lastName) as string,
+        title: null,
+        email: parsedValue(email) as string | null,
+        phone: parsedValue(phone) as string | null,
+        ageGroup: parsedValue(ageGroup) as GuestAgeGroup,
+        dietaryRequirements: parsedValue(dietaryRequirements) as string | null,
+        notes: parsedValue(notes) as string | null,
+      },
+      sectionIds: sectionIds.value,
     },
   };
 }
@@ -453,11 +472,13 @@ export async function createGuest(
 
   return runGuestAction("create guest", "edit", async (weddingId) => {
     const { tagIds, sectionIds, ...guestInput } = parsed.value;
+    const plusOneInput = parsedValue(plusOne);
     const guest = await guestRepository.createGuestWithPlusOne(weddingId, {
       primary: guestInput,
-      plusOne: parsedValue(plusOne),
+      plusOne: plusOneInput?.input ?? null,
       primaryTagIds: tagIds,
       primarySectionIds: sectionIds,
+      plusOneSectionIds: plusOneInput?.sectionIds,
     });
     revalidateGuestPaths(guest.id);
     return mapGuest(guest);
@@ -476,12 +497,12 @@ export async function addPlusOne(
   const plusOne = parsedValue(parsed);
   if (!plusOne) return failure("Plus-one first and last name are required");
 
-  const plusOneInput: PlusOneInput = plusOne;
   return runGuestAction("add plus-one", "edit", async (weddingId) => {
     const guest = await guestRepository.addPlusOne(
       weddingId,
       parsedValue(parsedId),
-      plusOneInput,
+      plusOne.input,
+      plusOne.sectionIds,
     );
     revalidateGuestPaths(guest.id);
     return mapGuest(guest);

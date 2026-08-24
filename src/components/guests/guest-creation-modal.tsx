@@ -52,10 +52,11 @@ export function GuestCreationModal({
   const [plusOneOpen, setPlusOneOpen] = useState(false);
   const [plusOneDraft, setPlusOneDraft] = useState<PlusOneDraft>(emptyPlusOne);
   const [selectedSections, setSelectedSections] = useState<string[]>([]);
+  const [selectedPlusOneSections, setSelectedPlusOneSections] = useState<string[]>([]);
   const [confirmation, setConfirmation] = useState<"close" | "collapse" | null>(null);
 
   function close() {
-    if (hasPlusOneDraft(plusOneDraft)) {
+    if (hasPlusOneDraft(plusOneDraft, selectedPlusOneSections)) {
       setConfirmation("close");
       return;
     }
@@ -68,18 +69,22 @@ export function GuestCreationModal({
     setPlusOneOpen(false);
     setPlusOneDraft(emptyPlusOne);
     setSelectedSections([]);
+    setSelectedPlusOneSections([]);
     setConfirmation(null);
     onClose();
   }
 
   function togglePlusOne() {
-    if (plusOneOpen && hasPlusOneDraft(plusOneDraft)) {
+    if (plusOneOpen && hasPlusOneDraft(plusOneDraft, selectedPlusOneSections)) {
       setConfirmation("collapse");
       return;
     }
 
     setPlusOneOpen((current) => !current);
-    if (plusOneOpen) setPlusOneDraft(emptyPlusOne);
+    if (plusOneOpen) {
+      setPlusOneDraft(emptyPlusOne);
+      setSelectedPlusOneSections([]);
+    }
   }
 
   function confirmDiscard() {
@@ -90,6 +95,7 @@ export function GuestCreationModal({
 
     setPlusOneOpen(false);
     setPlusOneDraft(emptyPlusOne);
+    setSelectedPlusOneSections([]);
     setConfirmation(null);
   }
 
@@ -115,7 +121,9 @@ export function GuestCreationModal({
         notes: formData.get("notes"),
         tagIds,
         sectionIds: selectedSections,
-        plusOne: plusOneOpen ? plusOneDraft : undefined,
+        plusOne: plusOneOpen
+          ? { ...plusOneDraft, sectionIds: selectedPlusOneSections }
+          : undefined,
       });
 
       if (!result.success) {
@@ -125,6 +133,7 @@ export function GuestCreationModal({
 
       form.reset();
       setPlusOneDraft(emptyPlusOne);
+      setSelectedPlusOneSections([]);
       setPlusOneOpen(false);
       close();
     });
@@ -205,6 +214,11 @@ export function GuestCreationModal({
                 <ControlledTextArea label="Dietary requirements" value={plusOneDraft.dietaryRequirements} onChange={(value) => setPlusOneDraft((draft) => ({ ...draft, dietaryRequirements: value }))} />
                 <ControlledTextArea label="Notes" value={plusOneDraft.notes} onChange={(value) => setPlusOneDraft((draft) => ({ ...draft, notes: value }))} />
               </div>
+              <GuestSectionSelector
+                onChange={setSelectedPlusOneSections}
+                sections={sections}
+                selectedSectionIds={selectedPlusOneSections}
+              />
             </div>
           ) : null}
         </div>
@@ -230,7 +244,7 @@ export function GuestCreationModal({
   );
 }
 
-function hasPlusOneDraft(draft: PlusOneDraft) {
+function hasPlusOneDraft(draft: PlusOneDraft, selectedSectionIds: string[]) {
   return [
     draft.firstName,
     draft.lastName,
@@ -238,7 +252,7 @@ function hasPlusOneDraft(draft: PlusOneDraft) {
     draft.phone,
     draft.dietaryRequirements,
     draft.notes,
-  ].some((value) => value.trim().length > 0);
+  ].some((value) => value.trim().length > 0) || selectedSectionIds.length > 0;
 }
 
 function Field({ label, name, defaultValue, type = "text", required = false, autoFocus = false }: { label: string; name: string; defaultValue: string; type?: string; required?: boolean; autoFocus?: boolean }) {

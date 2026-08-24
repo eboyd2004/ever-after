@@ -39,6 +39,11 @@ const guestInput = {
   ageGroup: "ADULT" as const,
   householdId: null,
 };
+const plusOneInput = {
+  firstName: "Grace",
+  lastName: "Hopper",
+  ageGroup: "ADULT" as const,
+};
 const sections = [
   { id: "section_ceremony", active: true },
   { id: "section_venue", active: true },
@@ -131,6 +136,64 @@ describe("guest wedding section assignments", () => {
     });
   });
 
+  it("creates a plus-one with one, multiple, all, or zero independent sections", async () => {
+    for (const selected of [
+      ["section_ceremony"],
+      ["section_ceremony", "section_venue"],
+      sections.map((section) => section.id),
+      [],
+    ]) {
+      vi.clearAllMocks();
+      transactionMock();
+      mocks.prisma.guestTag.count.mockResolvedValue(0);
+      mocks.prisma.guest.create.mockResolvedValue({ id: "guest_1" });
+      mocks.prisma.guest.findFirst.mockResolvedValue(guestDetail());
+      mocks.prisma.guestSectionAssignment.createMany.mockResolvedValue({ count: selected.length });
+      mocks.prisma.weddingSection.findMany.mockImplementation(async ({ where }) =>
+        sections.filter((section) => where.id.in.includes(section.id)),
+      );
+
+      await guestRepository.createGuestWithPlusOne(weddingId, {
+        primary: guestInput,
+        plusOne: plusOneInput,
+        primaryTagIds: [],
+        primarySectionIds: [],
+        plusOneSectionIds: selected,
+      });
+
+      const plusOneId = mocks.prisma.guest.create.mock.calls[1][0].data.id;
+      if (selected.length > 0) {
+        expect(mocks.prisma.guestSectionAssignment.createMany).toHaveBeenCalledWith({
+          data: selected.map((sectionId) => ({ guestId: plusOneId, sectionId })),
+        });
+      } else {
+        expect(mocks.prisma.guestSectionAssignment.createMany).not.toHaveBeenCalled();
+      }
+    }
+  });
+
+  it("keeps parent and plus-one section assignments independent", async () => {
+    mocks.prisma.weddingSection.findMany.mockImplementation(async ({ where }) =>
+      sections.filter((section) => where.id.in.includes(section.id)),
+    );
+
+    await guestRepository.createGuestWithPlusOne(weddingId, {
+      primary: guestInput,
+      plusOne: plusOneInput,
+      primaryTagIds: [],
+      primarySectionIds: ["section_ceremony"],
+      plusOneSectionIds: ["section_venue"],
+    });
+
+    const [primaryCreate, plusOneCreate] = mocks.prisma.guest.create.mock.calls;
+    expect(mocks.prisma.guestSectionAssignment.createMany).toHaveBeenNthCalledWith(1, {
+      data: [{ guestId: primaryCreate[0].data.id, sectionId: "section_ceremony" }],
+    });
+    expect(mocks.prisma.guestSectionAssignment.createMany).toHaveBeenNthCalledWith(2, {
+      data: [{ guestId: plusOneCreate[0].data.id, sectionId: "section_venue" }],
+    });
+  });
+
   it("rejects cross-wedding and inactive section assignments", async () => {
     mocks.prisma.weddingSection.findMany.mockResolvedValue([]);
     await expect(
@@ -147,6 +210,68 @@ describe("guest wedding section assignments", () => {
       guestRepository.createGuest(weddingId, guestInput, ["section_inactive"]),
     ).rejects.toThrow("cannot be newly assigned");
     expect(mocks.prisma.guest.create).not.toHaveBeenCalled();
+
+    vi.clearAllMocks();
+    transactionMock();
+    mocks.prisma.guestTag.count.mockResolvedValue(0);
+    mocks.prisma.weddingSection.findMany.mockResolvedValue([
+      { id: "section_inactive", active: false },
+    ]);
+    await expect(
+      guestRepository.createGuestWithPlusOne(weddingId, {
+        primary: guestInput,
+        plusOne: plusOneInput,
+        primaryTagIds: [],
+        plusOneSectionIds: ["section_inactive"],
+      }),
+    ).rejects.toThrow("cannot be newly assigned");
+    expect(mocks.prisma.guest.create).not.toHaveBeenCalled();
+  });
+
+  it("rolls back a new plus-one when section assignment persistence fails", async () => {
+    mocks.prisma.guestTag.count.mockResolvedValue(0);
+    mocks.prisma.weddingSection.findMany.mockResolvedValue([sections[0]]);
+    mocks.prisma.guestSectionAssignment.createMany.mockRejectedValue(
+      new Error("assignment write failed"),
+    );
+
+    await expect(
+      guestRepository.createGuestWithPlusOne(weddingId, {
+        primary: guestInput,
+        plusOne: plusOneInput,
+        primaryTagIds: [],
+        plusOneSectionIds: [sections[0].id],
+      }),
+    ).rejects.toThrow("Unable to create guest");
+    expect(mocks.prisma.$transaction).toHaveBeenCalledWith(
+      expect.any(Function),
+      { isolationLevel: "Serializable" },
+    );
+    expect(mocks.prisma.guest.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("adds a new plus-one with selected sections in the same transaction", async () => {
+    mocks.prisma.guest.findFirst
+      .mockResolvedValueOnce({
+        id: "guest_parent",
+        householdId: null,
+        plusOneForGuestId: null,
+        plusOnes: [],
+      })
+      .mockResolvedValueOnce(guestDetail());
+    mocks.prisma.weddingSection.findMany.mockResolvedValue([sections[1]]);
+
+    await guestRepository.addPlusOne(
+      weddingId,
+      "guest_parent",
+      plusOneInput,
+      ["section_venue"],
+    );
+
+    const plusOneId = mocks.prisma.guest.create.mock.calls[0][0].data.id;
+    expect(mocks.prisma.guestSectionAssignment.createMany).toHaveBeenCalledWith({
+      data: [{ guestId: plusOneId, sectionId: "section_venue" }],
+    });
   });
 
   it("preserves an existing inactive assignment when editing a guest", async () => {

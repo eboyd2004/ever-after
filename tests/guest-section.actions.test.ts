@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   requireRole: vi.fn(),
   createGuestWithPlusOne: vi.fn(),
+  addPlusOne: vi.fn(),
   updateGuest: vi.fn(),
   revalidatePath: vi.fn(),
 }));
@@ -25,11 +26,16 @@ vi.mock("../src/server/repositories/guest.repository", () => ({
   GuestRepositoryError: class GuestRepositoryError extends Error {},
   guestRepository: {
     createGuestWithPlusOne: mocks.createGuestWithPlusOne,
+    addPlusOne: mocks.addPlusOne,
     updateGuest: mocks.updateGuest,
   },
 }));
 
-import { createGuest, updateGuest } from "../src/server/actions/guests/guest.actions";
+import {
+  addPlusOne,
+  createGuest,
+  updateGuest,
+} from "../src/server/actions/guests/guest.actions";
 
 const guestId = "11111111-1111-4111-8111-111111111111";
 const ceremonyId = "22222222-2222-4222-8222-222222222222";
@@ -74,6 +80,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.requireRole.mockResolvedValue({ wedding: { id: "wedding_1" }, role: "EDITOR" });
   mocks.createGuestWithPlusOne.mockResolvedValue(guestRecord());
+  mocks.addPlusOne.mockResolvedValue(guestRecord());
   mocks.updateGuest.mockResolvedValue(guestRecord());
 });
 
@@ -102,6 +109,40 @@ describe("guest section assignment actions", () => {
     expect(mocks.createGuestWithPlusOne).toHaveBeenCalledWith(
       "wedding_1",
       expect.objectContaining({ primarySectionIds: [] }),
+    );
+  });
+
+  it("passes plus-one section selections separately through both create paths", async () => {
+    await createGuest({
+      ...baseInput,
+      sectionIds: [ceremonyId],
+      plusOne: {
+        firstName: "Grace",
+        lastName: "Hopper",
+        sectionIds: [venueId],
+      },
+    });
+
+    expect(mocks.createGuestWithPlusOne).toHaveBeenCalledWith(
+      "wedding_1",
+      expect.objectContaining({
+        primarySectionIds: [ceremonyId],
+        plusOneSectionIds: [venueId],
+        plusOne: expect.objectContaining({ firstName: "Grace" }),
+      }),
+    );
+
+    await addPlusOne(guestId, {
+      firstName: "Grace",
+      lastName: "Hopper",
+      sectionIds: [ceremonyId, venueId],
+    });
+
+    expect(mocks.addPlusOne).toHaveBeenCalledWith(
+      "wedding_1",
+      guestId,
+      expect.objectContaining({ firstName: "Grace" }),
+      [ceremonyId, venueId],
     );
   });
 

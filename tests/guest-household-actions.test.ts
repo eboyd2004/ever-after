@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   requireRole: vi.fn(),
+  createGuestWithPlusOne: vi.fn(),
+  addPlusOne: vi.fn(),
   deleteGuest: vi.fn(),
   updateGuest: vi.fn(),
   deleteHousehold: vi.fn(),
@@ -29,7 +31,12 @@ vi.mock("../src/server/logging/logger", () => ({
 }));
 vi.mock("../src/server/repositories/guest.repository", () => ({
   GuestRepositoryError: class GuestRepositoryError extends Error {},
-  guestRepository: { deleteGuest: mocks.deleteGuest, updateGuest: mocks.updateGuest },
+  guestRepository: {
+    createGuestWithPlusOne: mocks.createGuestWithPlusOne,
+    addPlusOne: mocks.addPlusOne,
+    deleteGuest: mocks.deleteGuest,
+    updateGuest: mocks.updateGuest,
+  },
 }));
 vi.mock("../src/server/repositories/household.repository", () => ({
   HouseholdRepositoryError: class HouseholdRepositoryError extends Error {},
@@ -40,7 +47,12 @@ vi.mock("../src/server/repositories/household.repository", () => ({
 }));
 
 import { PermissionDeniedError } from "../src/server/auth/authorization";
-import { deleteGuest, updateGuest } from "../src/server/actions/guests/guest.actions";
+import {
+  addPlusOne,
+  createGuest,
+  deleteGuest,
+  updateGuest,
+} from "../src/server/actions/guests/guest.actions";
 import {
   createHousehold,
   deleteHousehold,
@@ -79,6 +91,37 @@ describe("guest and household mutation authorization", () => {
       error: "You do not have permission to perform this action.",
     });
     expect(mocks.updateGuest).not.toHaveBeenCalled();
+  });
+
+  it("does not allow VIEWER users to create or add plus-one section assignments", async () => {
+    const createResult = await createGuest({
+      firstName: "Ada",
+      lastName: "Lovelace",
+      ageGroup: "ADULT",
+      sectionIds: [],
+      tagIds: [],
+      plusOne: {
+        firstName: "Grace",
+        lastName: "Hopper",
+        sectionIds: [],
+      },
+    });
+    const addResult = await addPlusOne(guestId, {
+      firstName: "Grace",
+      lastName: "Hopper",
+      sectionIds: [],
+    });
+
+    expect(createResult).toEqual({
+      success: false,
+      error: "You do not have permission to perform this action.",
+    });
+    expect(addResult).toEqual({
+      success: false,
+      error: "You do not have permission to perform this action.",
+    });
+    expect(mocks.createGuestWithPlusOne).not.toHaveBeenCalled();
+    expect(mocks.addPlusOne).not.toHaveBeenCalled();
   });
 
   it("keeps household deletion rejected for VIEWER users", async () => {

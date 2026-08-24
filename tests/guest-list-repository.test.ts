@@ -82,7 +82,7 @@ function householdRecord() {
         email: null,
         phone: null,
         ageGroup: "ADULT",
-        sectionAssignments: [],
+        sectionAssignments: [{ section: { id: "section_2", name: "Venue", active: true } }],
         tagAssignments: [],
         plusOneFor: {
           id: "guest_3",
@@ -128,7 +128,11 @@ describe("guestListRepository", () => {
       firstName: "Ada",
       tags: [{ id: "tag_1", name: "VIP" }],
       sections: [{ id: "section_1", name: "Ceremony", active: true }],
-      plusOnes: [{ id: "guest_2", firstName: "Charles" }],
+      plusOnes: [{
+        id: "guest_2",
+        firstName: "Charles",
+        sections: [{ id: "section_2", name: "Venue", active: true }],
+      }],
     });
     expect(result.households[0]).toMatchObject({
       id: "household_1",
@@ -140,6 +144,10 @@ describe("guestListRepository", () => {
     expect(result.households[0]?.guests[0]).toMatchObject({
       id: "guest_3",
       plusOnes: [{ id: "guest_4" }],
+    });
+    expect(result.households[0]?.guests[1]).toMatchObject({
+      id: "guest_4",
+      sections: [{ id: "section_2", name: "Venue", active: true }],
     });
     expect(result.tags).toEqual([{ id: "tag_1", name: "VIP" }]);
 

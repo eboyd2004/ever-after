@@ -36,6 +36,7 @@ export type CreateGuestWithPlusOneInput = {
   plusOne: GuestInput | null;
   primaryTagIds: string[];
   primarySectionIds?: string[];
+  plusOneSectionIds?: string[];
 };
 
 export type PlusOneInput = Omit<GuestInput, "householdId" | "plusOneForGuestId">;
@@ -527,6 +528,13 @@ export class GuestRepository {
           weddingId,
           input.primarySectionIds ?? [],
         );
+        const plusOneSectionIds = input.plusOne
+          ? await this.validateSectionIds(
+              tx,
+              weddingId,
+              input.plusOneSectionIds ?? [],
+            )
+          : [];
 
         const tagIds = [...new Set(input.primaryTagIds)];
         const tagCount = await tx.guestTag.count({
@@ -550,13 +558,13 @@ export class GuestRepository {
             data: tagIds.map((tagId) => ({ guestId: primaryId, tagId })),
           });
         }
-        if (sectionIds.length > 0) {
-          await tx.guestSectionAssignment.createMany({
-            data: sectionIds.map((sectionId) => ({
-              guestId: primaryId,
-              sectionId,
-            })),
-          });
+        await this.replaceGuestSectionAssignments(tx, primaryId, sectionIds);
+        if (plusOneId) {
+          await this.replaceGuestSectionAssignments(
+            tx,
+            plusOneId,
+            plusOneSectionIds,
+          );
         }
       }, { isolationLevel: "Serializable" });
 
@@ -576,6 +584,7 @@ export class GuestRepository {
     weddingId: string,
     guestId: string,
     input: PlusOneInput,
+    sectionIds: string[] = [],
   ) {
     try {
       const plusOneId = randomUUID();
@@ -600,6 +609,12 @@ export class GuestRepository {
           throw new GuestRepositoryError("This guest already has a plus-one");
         }
 
+        const validSectionIds = await this.validateSectionIds(
+          tx,
+          weddingId,
+          sectionIds,
+        );
+
         await tx.guest.create({
           data: {
             id: plusOneId,
@@ -609,6 +624,11 @@ export class GuestRepository {
             plusOneForGuestId: parent.id,
           },
         });
+        await this.replaceGuestSectionAssignments(
+          tx,
+          plusOneId,
+          validSectionIds,
+        );
       }, { isolationLevel: "Serializable" });
 
       return this.getGuest(weddingId, guestId);

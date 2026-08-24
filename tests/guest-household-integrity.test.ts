@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
     },
     guestSectionAssignment: {
       deleteMany: vi.fn(),
+      createMany: vi.fn(),
     },
   },
 }));
@@ -385,6 +386,33 @@ describe("plus-one integrity", () => {
       },
       data: { plusOneForGuestId: "guest_parent" },
     });
+  });
+
+  it("preserves existing section assignments when attaching a guest as a plus-one", async () => {
+    mocks.prisma.guest.findFirst
+      .mockResolvedValueOnce({
+        id: "guest_parent",
+        householdId: null,
+        plusOneForGuestId: null,
+        plusOnes: [],
+      })
+      .mockResolvedValueOnce({
+        id: "guest_plus_one",
+        householdId: null,
+        plusOneForGuestId: null,
+        plusOnes: [],
+        household: null,
+      })
+      .mockResolvedValueOnce(guestDetail);
+
+    await guestRepository.attachExistingGuestAsPlusOne(
+      weddingId,
+      "guest_parent",
+      "guest_plus_one",
+    );
+
+    expect(mocks.prisma.guestSectionAssignment.deleteMany).not.toHaveBeenCalled();
+    expect(mocks.prisma.guestSectionAssignment.createMany).not.toHaveBeenCalled();
   });
 
   it("rejects a stale conditional plus-one attachment instead of re-parenting", async () => {

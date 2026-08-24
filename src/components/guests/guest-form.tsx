@@ -49,6 +49,7 @@ export function GuestForm({
   const [selectedSections, setSelectedSections] = useState<string[]>(
     guest?.sections.map((section) => section.id) ?? [],
   );
+  const [selectedPlusOneSections, setSelectedPlusOneSections] = useState<string[]>([]);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -92,7 +93,7 @@ export function GuestForm({
   }
 
   function togglePlusOne() {
-    if (plusOneOpen && (hasPlusOneDraft(plusOneDraft) || existingGuestId)) {
+    if (plusOneOpen && (hasPlusOneDraft(plusOneDraft, selectedPlusOneSections) || existingGuestId)) {
       setConfirmation("collapse");
       return;
     }
@@ -101,6 +102,7 @@ export function GuestForm({
 
   function confirmCollapsePlusOne() {
     setPlusOneDraft(emptyPlusOne);
+    setSelectedPlusOneSections([]);
     setExistingGuestId("");
     setPlusOneOpen(false);
     setConfirmation(null);
@@ -117,6 +119,7 @@ export function GuestForm({
         return;
       }
       setExistingGuestId("");
+      setSelectedPlusOneSections([]);
       setPlusOneOpen(false);
       setMessage("Existing guest attached as a plus-one.");
       router.refresh();
@@ -128,12 +131,16 @@ export function GuestForm({
     setError(null);
     setMessage(null);
     startTransition(async () => {
-      const result = await addPlusOne(guest.id, plusOneDraft);
+      const result = await addPlusOne(guest.id, {
+        ...plusOneDraft,
+        sectionIds: selectedPlusOneSections,
+      });
       if (!result.success) {
         setError(result.error);
         return;
       }
       setPlusOneDraft(emptyPlusOne);
+      setSelectedPlusOneSections([]);
       setPlusOneOpen(false);
       setMessage("Plus-one added.");
       router.refresh();
@@ -332,6 +339,11 @@ export function GuestForm({
                 <ControlledTextArea label="Dietary requirements" value={plusOneDraft.dietaryRequirements} onChange={(value) => setPlusOneDraft((draft) => ({ ...draft, dietaryRequirements: value }))} />
                 <ControlledTextArea label="Notes" value={plusOneDraft.notes} onChange={(value) => setPlusOneDraft((draft) => ({ ...draft, notes: value }))} />
               </div>
+              <GuestSectionSelector
+                onChange={setSelectedPlusOneSections}
+                sections={sections}
+                selectedSectionIds={selectedPlusOneSections}
+              />
               <Button disabled={isPending} onClick={submitPlusOne} type="button" variant="secondary">
                 {isPending ? "Adding…" : "Add plus-one"}
               </Button>
@@ -446,7 +458,7 @@ const emptyPlusOne: PlusOneDraft = {
   notes: "",
 };
 
-function hasPlusOneDraft(draft: PlusOneDraft) {
+function hasPlusOneDraft(draft: PlusOneDraft, selectedSectionIds: string[]) {
   return [
     draft.firstName,
     draft.lastName,
@@ -454,7 +466,7 @@ function hasPlusOneDraft(draft: PlusOneDraft) {
     draft.phone,
     draft.dietaryRequirements,
     draft.notes,
-  ].some((value) => value.trim().length > 0);
+  ].some((value) => value.trim().length > 0) || selectedSectionIds.length > 0;
 }
 
 function ControlledField({
