@@ -135,7 +135,7 @@ export function GuestCreationModal({
       setPlusOneDraft(emptyPlusOne);
       setSelectedPlusOneSections([]);
       setPlusOneOpen(false);
-      close();
+      performClose();
     });
   }
 
