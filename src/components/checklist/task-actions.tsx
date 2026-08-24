@@ -32,6 +32,7 @@ export function TaskActions({
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -59,33 +60,48 @@ export function TaskActions({
 
   return (
     <>
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="relative shrink-0">
         <button
-          aria-label={`Edit task ${task.title}`}
-          aria-haspopup="dialog"
-          className="rounded-md p-1.5 text-[#6B6B63] transition hover:bg-[#EAF0E8] hover:text-[#2D5A27] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2D5A27]"
-          onClick={() => {
-            setError(null);
-            setEditOpen(true);
-          }}
-          title="Edit task"
+          aria-expanded={menuOpen}
+          aria-haspopup="menu"
+          aria-label={`Task actions for ${task.title}`}
+          className="rounded-md p-1.5 text-[#6B6B63] transition hover:bg-[#F4F4F1] hover:text-[#1C1C1C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2D5A27]"
+          onClick={() => setMenuOpen((open) => !open)}
+          title="Task actions"
           type="button"
         >
-          <Icon name="edit" size={15} />
+          <Icon name="more" size={17} />
         </button>
-        <button
-          aria-label={`Delete task ${task.title}`}
-          aria-haspopup="dialog"
-          className="rounded-md p-1.5 text-[#9D3F32] transition hover:bg-[#FFF5F3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9D3F32]"
-          onClick={() => {
-            setError(null);
-            setDeleteOpen(true);
-          }}
-          title="Delete task"
-          type="button"
+        <div
+          className="absolute right-0 top-full z-20 mt-1 min-w-32 rounded-lg border border-[#E8E8E3] bg-white p-1 shadow-[0_8px_24px_rgba(28,28,28,0.12)]"
+          hidden={!menuOpen}
+          role="menu"
         >
-          <Icon name="trash" size={15} />
-        </button>
+          <button
+            className="block w-full rounded-md px-3 py-2 text-left text-xs font-medium text-[#6B6B63] hover:bg-[#F4F4F1] hover:text-[#1C1C1C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2D5A27]"
+            onClick={() => {
+              setError(null);
+              setMenuOpen(false);
+              setEditOpen(true);
+            }}
+            role="menuitem"
+            type="button"
+          >
+            Edit task
+          </button>
+          <button
+            className="block w-full rounded-md px-3 py-2 text-left text-xs font-medium text-[#9D3F32] hover:bg-[#FFF5F3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9D3F32]"
+            onClick={() => {
+              setError(null);
+              setMenuOpen(false);
+              setDeleteOpen(true);
+            }}
+            role="menuitem"
+            type="button"
+          >
+            Delete task
+          </button>
+        </div>
       </div>
 
       {error ? (

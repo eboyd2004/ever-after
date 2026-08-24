@@ -12,6 +12,7 @@ export type IconName =
   | "grid"
   | "heart"
   | "menu"
+  | "more"
   | "note"
   | "pin"
   | "plus"
@@ -37,6 +38,7 @@ const paths: Record<IconName, string> = {
   grid: "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z",
   heart: "M20.8 8.6c0 5.4-8.8 10.4-8.8 10.4S3.2 14 3.2 8.6A4.6 4.6 0 0 1 12 6.1a4.6 4.6 0 0 1 8.8 2.5Z",
   menu: "M4 6h16M4 12h16M4 18h16",
+  more: "M5 12h.01M12 12h.01M19 12h.01",
   note: "M5 4h14v16H5zM8 8h8M8 12h8M8 16h5",
   pin: "M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11Z M12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z",
   plus: "M12 5v14M5 12h14",

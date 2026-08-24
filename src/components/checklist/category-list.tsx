@@ -1,3 +1,5 @@
+"use client";
+
 import { CategorySection } from "./category-section";
 import type { CategoryViewModel } from "./types";
 

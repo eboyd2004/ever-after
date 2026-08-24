@@ -79,9 +79,11 @@ describe("checklist task CRUD UI", () => {
     const editorMarkup = renderRow(true);
 
     for (const markup of [ownerMarkup, editorMarkup]) {
-      expect(markup).toContain('aria-label="Edit task Book photographer"');
-      expect(markup).toContain('aria-label="Delete task Book photographer"');
-      expect(markup).toContain('aria-haspopup="dialog"');
+      expect(markup).toContain('aria-label="Task actions for Book photographer"');
+      expect(markup).toContain('aria-haspopup="menu"');
+      expect(markup).toContain('title="Task actions"');
+      expect(markup).toContain("Edit task");
+      expect(markup).toContain("Delete task");
     }
   });
 
@@ -113,7 +115,7 @@ describe("checklist task CRUD UI", () => {
     expect(formMarkup).toContain("Due date");
     expect(formMarkup).toContain("Assignee");
     expect(formMarkup).toContain("Save changes");
-    expect(rowMarkup).toContain('aria-label="Delete task Book photographer"');
+    expect(rowMarkup).toContain('aria-label="Task actions for Book photographer"');
   });
 
   it("keeps complete and reopen controls available", () => {

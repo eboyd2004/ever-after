@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 
-import { Badge } from "../shared/ui";
 import { TaskActions } from "./task-actions";
 import { TaskStatusButton } from "./task-status-button";
 import type {
@@ -34,17 +33,17 @@ function formatDate(value: string | null) {
   }).format(new Date(value));
 }
 
-function priorityTone(priority: string) {
+function priorityClass(priority: string) {
   switch (priority) {
     case "HIGH":
     case "URGENT":
-      return "danger" as const;
+      return "text-[#9D3F32]";
     case "MEDIUM":
-      return "warning" as const;
+      return "text-[#B07C1A]";
     case "LOW":
-      return "success" as const;
+      return "text-[#4A7C57]";
     default:
-      return "default" as const;
+      return "text-[#6B6B63]";
   }
 }
 
@@ -102,13 +101,17 @@ export function TaskRow({
           </div>
         </div>
 
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11.5px] text-[#8A8A82]">
-          <Badge>{formatStatus(optimisticStatus)}</Badge>
-          <Badge tone={priorityTone(task.priority)}>
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-[#8A8A82]">
+          {dueDate ? <span className="whitespace-nowrap">Due {dueDate}</span> : null}
+          {task.assignee ? (
+            <span className="whitespace-nowrap">{assigneeLabel(task)}</span>
+          ) : null}
+          <span className={`whitespace-nowrap font-medium ${priorityClass(task.priority)}`}>
             {formatStatus(task.priority)}
-          </Badge>
-          {dueDate ? <span className="whitespace-nowrap">{dueDate}</span> : null}
-          <span className="whitespace-nowrap">{assigneeLabel(task)}</span>
+          </span>
+          <span className={`whitespace-nowrap ${completed ? "text-[#8A8A82]" : "text-[#6B6B63]"}`}>
+            {formatStatus(optimisticStatus)}
+          </span>
         </div>
       </div>
 

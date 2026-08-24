@@ -2,7 +2,7 @@ import { CategoryActions } from "./category-actions";
 import { isCategoryIcon } from "./category-options";
 import { TaskRow } from "./task-row";
 import { Icon } from "../shared/icons";
-import { Badge, ProgressBar } from "../shared/ui";
+import { ProgressBar } from "../shared/ui";
 import type { CategoryViewModel } from "./types";
 
 type CategorySectionProps = CategoryViewModel & {
@@ -29,8 +29,9 @@ export function CategorySection({
     : null;
 
   return (
-    <details className="group overflow-hidden rounded-[14px] border border-[#E8E8E3] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)]" open>
-      <summary className="flex cursor-pointer list-none items-center gap-3 border-b border-[#F4F4F1] px-4 py-3.5 hover:bg-[#F7F7F4] sm:px-5">
+    <div className="relative">
+      <details className="group rounded-[14px] border border-[#E8E8E3] bg-white" open>
+        <summary className={`flex cursor-pointer list-none items-center gap-3 border-b border-[#F4F4F1] px-4 py-3.5 hover:bg-[#F7F7F4] sm:px-5 ${canEdit ? "pr-24 sm:pr-28" : ""}`}>
         <span className="text-[#8A8A82] group-open:hidden">
           <Icon name="chevron-right" size={16} />
         </span>
@@ -45,19 +46,40 @@ export function CategorySection({
         <span className="min-w-0 truncate text-sm font-semibold text-[#1C1C1C]">
           {category.name}
         </span>
-        <Badge>
+        <span className="whitespace-nowrap text-xs font-medium text-[#8A8A82]">
           {completedCount}/{tasks.length}
-        </Badge>
+        </span>
         <ProgressBar
-          className="hidden max-w-[120px] flex-1 sm:block"
-          height="h-1"
+          className="hidden max-w-[100px] flex-1 sm:block"
+          height="h-1.5"
           value={completedCount}
           max={tasks.length}
         />
         <span className="ml-auto text-xs font-semibold text-[#2D5A27]">
           {completionPercentage}%
         </span>
-      </summary>
+        </summary>
+
+        <div className="p-2 sm:p-3">
+          {tasks.length > 0 ? (
+            <ul>
+              {tasks.map((taskViewModel) => (
+                <TaskRow
+                  canEdit={canEdit}
+                  categories={categoryOptions}
+                  key={`${taskViewModel.task.id}-${taskViewModel.task.updatedAt}`}
+                  members={members}
+                  {...taskViewModel}
+                />
+              ))}
+            </ul>
+          ) : (
+            <p className="rounded-lg border border-dashed border-[#E4E0D4] px-4 py-5 text-sm text-[#8A8A82]">
+              No tasks in this category yet.
+            </p>
+          )}
+        </div>
+      </details>
 
       {canEdit ? (
         <CategoryActions
@@ -68,26 +90,6 @@ export function CategorySection({
           updateCategoryAction={updateCategoryAction}
         />
       ) : null}
-
-      <div className="p-2 sm:p-3">
-        {tasks.length > 0 ? (
-          <ul>
-            {tasks.map((taskViewModel) => (
-              <TaskRow
-                canEdit={canEdit}
-                categories={categoryOptions}
-                key={`${taskViewModel.task.id}-${taskViewModel.task.updatedAt}`}
-                members={members}
-                {...taskViewModel}
-              />
-            ))}
-          </ul>
-        ) : (
-          <p className="rounded-lg border border-dashed border-[#E4E0D4] px-4 py-5 text-sm text-[#8A8A82]">
-            No tasks in this category yet.
-          </p>
-        )}
-      </div>
-    </details>
+    </div>
   );
 }

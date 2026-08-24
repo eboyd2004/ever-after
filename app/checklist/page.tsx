@@ -12,10 +12,9 @@ import {
   updateCategory as updateCategoryAction,
   updateTask as updateTaskAction,
 } from "@/src/server/actions/checklist/checklist.actions";
-import { CategoryList } from "@/src/components/checklist/category-list";
+import { ChecklistBrowser } from "@/src/components/checklist/checklist-browser";
 import { ChecklistPageHeader } from "@/src/components/checklist/checklist-page-header";
 import { ChecklistProgressOverview } from "@/src/components/checklist/checklist-progress-overview";
-import { ChecklistToolbar } from "@/src/components/checklist/checklist-toolbar";
 import { WeddingRequiredState } from "@/src/components/shared/wedding-required-state";
 import type {
   AssignableMemberActionData,
@@ -232,11 +231,6 @@ export default async function ChecklistPage() {
     });
   }
 
-  const categoryProgress = categories.map(({ category, tasks }) => ({
-    name: category.name,
-    completed: tasks.filter((task) => task.status === "COMPLETED").length,
-    total: tasks.length,
-  }));
   const priorities = Array.from(
     new Set(allTasks.map((task) => task.priority)),
   ).map((priority) =>
@@ -246,13 +240,10 @@ export default async function ChecklistPage() {
   );
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <ChecklistPageHeader
-        completedCount={completedTaskCount}
-        completionPercentage={completionPercentage}
         canEdit={canEdit}
         createCategoryAction={createCategoryForWedding}
-        totalCount={totalTaskCount}
         weddingDate={formatWeddingDate(
           context.wedding.weddingDate,
           context.wedding.timezone,
@@ -261,21 +252,16 @@ export default async function ChecklistPage() {
       />
 
       <ChecklistProgressOverview
-        categories={categoryProgress}
         completedCount={completedTaskCount}
         completionPercentage={completionPercentage}
         totalCount={totalTaskCount}
       />
 
-      <ChecklistToolbar
-        categoryNames={categories.map(({ category }) => category.name)}
-        completedCount={completedTaskCount}
-        incompleteCount={totalTaskCount - completedTaskCount}
+      <ChecklistBrowser
+        canEdit={canEdit}
+        categories={categoryViewModels}
         priorities={priorities}
-        totalCount={totalTaskCount}
       />
-
-      <CategoryList canEdit={canEdit} categories={categoryViewModels} />
     </div>
   );
 }
