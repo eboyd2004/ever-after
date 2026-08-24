@@ -23,7 +23,7 @@ export function ManageCategoriesModal({
         description="Add a category to organise your wedding planning tasks."
         onClose={() => setOpen(false)}
         open={open}
-        title="Manage categories"
+        title="Add Category"
       >
         <CreateCategoryForm
           action={action}

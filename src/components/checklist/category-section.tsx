@@ -11,6 +11,7 @@ type CategorySectionProps = CategoryViewModel & {
 
 export function CategorySection({
   category,
+  categoryOptions,
   canEdit,
   members,
   tasks,
@@ -74,7 +75,9 @@ export function CategorySection({
             {tasks.map((taskViewModel) => (
               <TaskRow
                 canEdit={canEdit}
-                key={taskViewModel.task.id}
+                categories={categoryOptions}
+                key={`${taskViewModel.task.id}-${taskViewModel.task.updatedAt}`}
+                members={members}
                 {...taskViewModel}
               />
             ))}

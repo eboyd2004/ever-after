@@ -3,11 +3,18 @@
 import { useState } from "react";
 
 import { Badge } from "../shared/ui";
+import { TaskActions } from "./task-actions";
 import { TaskStatusButton } from "./task-status-button";
-import type { TaskViewModel } from "./types";
+import type {
+  ChecklistCategoryOption,
+  ChecklistMember,
+  TaskViewModel,
+} from "./types";
 
 type TaskRowProps = TaskViewModel & {
   canEdit: boolean;
+  categories: ChecklistCategoryOption[];
+  members: ChecklistMember[];
 };
 
 function formatStatus(status: string) {
@@ -51,13 +58,23 @@ function assigneeLabel(task: TaskViewModel["task"]) {
   return "Assigned";
 }
 
-export function TaskRow({ canEdit, task, completeAction, reopenAction }: TaskRowProps) {
+export function TaskRow({
+  canEdit,
+  categories,
+  completeAction,
+  deleteAction,
+  members,
+  reopenAction,
+  task,
+  updateAction,
+}: TaskRowProps) {
   const [optimisticStatus, setOptimisticStatus] = useState(task.status);
+
   const completed = optimisticStatus === "COMPLETED";
   const dueDate = formatDate(task.dueDate);
 
   return (
-    <li className="flex items-start gap-3 rounded-lg px-2.5 py-2.5 transition-colors hover:bg-[#F7F7F4]">
+    <li className="relative flex items-start gap-3 rounded-lg px-2.5 py-2.5 transition-colors hover:bg-[#F7F7F4]">
       {canEdit ? (
         <TaskStatusButton
           completed={completed}
@@ -94,6 +111,16 @@ export function TaskRow({ canEdit, task, completeAction, reopenAction }: TaskRow
           <span className="whitespace-nowrap">{assigneeLabel(task)}</span>
         </div>
       </div>
+
+      {canEdit ? (
+        <TaskActions
+          categories={categories}
+          deleteAction={deleteAction}
+          members={members}
+          task={task}
+          updateAction={updateAction}
+        />
+      ) : null}
     </li>
   );
 }

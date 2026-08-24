@@ -4,11 +4,13 @@ import {
   createCategory as createCategoryAction,
   createTask as createTaskAction,
   deleteCategory as deleteCategoryAction,
+  deleteTask as deleteTaskAction,
   getCategories,
   getAssignableMembers,
   getTasks,
   reopenTask as reopenTaskAction,
   updateCategory as updateCategoryAction,
+  updateTask as updateTaskAction,
 } from "@/src/server/actions/checklist/checklist.actions";
 import { CategoryList } from "@/src/components/checklist/category-list";
 import { ChecklistPageHeader } from "@/src/components/checklist/checklist-page-header";
@@ -118,6 +120,10 @@ export default async function ChecklistPage() {
   const canEdit = context.role !== "VIEWER";
 
   const allTasks = categories.flatMap(({ tasks }) => tasks);
+  const categoryOptions = categories.map(({ category }) => ({
+    id: category.id,
+    name: category.name,
+  }));
   const totalTaskCount = allTasks.length;
   const completedTaskCount = allTasks.filter(
     (task) => task.status === "COMPLETED",
@@ -188,17 +194,36 @@ export default async function ChecklistPage() {
         return reopenTaskAction(taskId);
       };
 
+      const updateTaskForWedding = async (
+        input: unknown,
+      ): Promise<ActionResult<TaskActionData>> => {
+        "use server";
+
+        return updateTaskAction(taskId, input);
+      };
+
+      const deleteTaskForWedding = async (): Promise<
+        ActionResult<TaskActionData>
+      > => {
+        "use server";
+
+        return deleteTaskAction(taskId);
+      };
+
       return {
         task,
         completeAction: isCompleted
           ? reopenTaskForWedding
           : completeTaskForWedding,
         reopenAction: reopenTaskForWedding,
+        updateAction: updateTaskForWedding,
+        deleteAction: deleteTaskForWedding,
       };
     });
 
     categoryViewModels.push({
       category,
+      categoryOptions,
       members,
       tasks: taskViewModels,
       createTaskAction: createTaskForCategory,
