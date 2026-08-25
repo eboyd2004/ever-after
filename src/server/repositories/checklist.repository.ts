@@ -199,6 +199,23 @@ export class ChecklistRepository {
     });
   }
 
+  async getTasksForWedding(weddingId: string) {
+    return this.execute("load wedding tasks", () =>
+      prisma.task.findMany({
+        where: {
+          weddingId,
+          category: { weddingId },
+        },
+        orderBy: [
+          { categoryId: "asc" },
+          { position: "asc" },
+          { createdAt: "asc" },
+        ],
+        include: taskListInclude,
+      }),
+    );
+  }
+
   async getTask(id: string) {
     return this.execute("load task", async () => {
       const task = await prisma.task.findUnique({

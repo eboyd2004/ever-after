@@ -33,7 +33,7 @@ export const navigationItems = [
   { href: "/dashboard", label: "Dashboard", icon: "dashboard", group: "main", disabled: false },
   { href: "/checklist", label: "Checklist", icon: "checklist", group: "main", disabled: false },
   { href: "/guests", label: "Guests", icon: "users", group: "planning", disabled: false },
-  { href: "/invitations", label: "Invitations", icon: "file", group: "planning", disabled: true },
+  { href: "/invitations", label: "Guest invitations", icon: "file", group: "planning", disabled: true },
   { href: "/rsvps", label: "RSVPs", icon: "heart", group: "planning", disabled: true },
   { href: "/seating", label: "Seating Plan", icon: "grid", group: "planning", disabled: true },
   { href: "/suppliers", label: "Suppliers", icon: "venue", group: "planning", disabled: true },

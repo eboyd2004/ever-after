@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 
 import { createGuestTag } from "@/src/server/actions/guests/guest-tag.actions";
 import type { GuestListTag } from "@/src/server/repositories/guest-list.repository";
@@ -14,7 +13,6 @@ export function GuestTagManager({
   tags: GuestListTag[];
   canEdit: boolean;
 }) {
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -40,7 +38,6 @@ export function GuestTagManager({
 
       form.reset();
       setMessage("Tag created. It is now available when editing a guest.");
-      router.refresh();
     });
   }
 

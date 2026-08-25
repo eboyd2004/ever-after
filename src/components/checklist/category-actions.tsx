@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { ConfirmDialog } from "../shared/confirm-dialog";
@@ -28,7 +27,6 @@ export function CategoryActions({
   members,
   updateCategoryAction,
 }: CategoryActionsProps) {
-  const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -49,7 +47,6 @@ export function CategoryActions({
         }
 
         setDeleteOpen(false);
-        router.refresh();
       } catch {
         setError("Unable to delete the category. Please try again.");
         setDeleteOpen(false);
@@ -129,7 +126,6 @@ export function CategoryActions({
           }}
           onSuccess={() => {
             setEditOpen(false);
-            router.refresh();
           }}
           submitLabel="Save changes"
           successMessage="Category updated."

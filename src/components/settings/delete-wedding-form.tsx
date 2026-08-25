@@ -31,7 +31,6 @@ export function DeleteWeddingForm({ weddingName }: DeleteWeddingFormProps) {
       // A user may intentionally keep an account without a wedding. Return
       // to the normal shell so the optional-onboarding flow is preserved.
       router.push("/dashboard");
-      router.refresh();
     });
   }
 

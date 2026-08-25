@@ -543,9 +543,11 @@ export class GuestListRepository {
     weddingId: string,
     filters: GuestListFilters = {},
   ): Promise<GuestListData> {
-    const standaloneGuests = await this.listStandaloneGuests(weddingId, filters);
-    const households = await this.listHouseholds(weddingId, filters);
-    const tags = await this.listTags(weddingId);
+    const [standaloneGuests, households, tags] = await Promise.all([
+      this.listStandaloneGuests(weddingId, filters),
+      this.listHouseholds(weddingId, filters),
+      this.listTags(weddingId),
+    ]);
 
     return { standaloneGuests, households, tags };
   }

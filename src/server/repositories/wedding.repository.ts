@@ -196,6 +196,35 @@ export class WeddingRepository {
     }
   }
 
+  async listActiveMembers(weddingId: string) {
+    try {
+      return await prisma.weddingMember.findMany({
+        where: {
+          weddingId,
+          status: MembershipStatus.ACTIVE,
+        },
+        select: {
+          id: true,
+          role: true,
+          joinedAt: true,
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              profileImageUrl: true,
+            },
+          },
+        },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      });
+    } catch (error) {
+      logger.error("[wedding-repository] list active members failed", error);
+      throw new WeddingRepositoryError("Unable to load wedding members");
+    }
+  }
+
   async setActiveWedding(userId: string, weddingId: string) {
     try {
       return await prisma.userPreference.upsert({
@@ -219,7 +248,7 @@ export class WeddingRepository {
   async deleteWedding(weddingId: string, userId: string) {
     try {
       return await prisma.$transaction(async (tx) => {
-        // Clear preferences before deleting the Wedding. Invitations, guests,
+        // Clear preferences before deleting the Wedding. Member invitations, guests,
         // households, tags, and sections are removed by their declared
         // database cascades when the Wedding is deleted.
         await tx.userPreference.updateMany({

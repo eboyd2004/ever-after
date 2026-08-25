@@ -88,7 +88,6 @@ export function GuestForm({
         setSelectedTags([]);
         setSelectedSections([]);
       }
-      router.refresh();
     });
   }
 
@@ -122,7 +121,6 @@ export function GuestForm({
       setSelectedPlusOneSections([]);
       setPlusOneOpen(false);
       setMessage("Existing guest attached as a plus-one.");
-      router.refresh();
     });
   }
 
@@ -143,7 +141,6 @@ export function GuestForm({
       setSelectedPlusOneSections([]);
       setPlusOneOpen(false);
       setMessage("Plus-one added.");
-      router.refresh();
     });
   }
 
@@ -164,7 +161,6 @@ export function GuestForm({
 
       setConfirmation(null);
       router.push("/guests");
-      router.refresh();
     });
   }
 

@@ -2,7 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 
-import { ActiveWeddingRequiredError } from "../../auth/get-active-wedding";
+import {
+  ActiveWeddingRequiredError,
+  requireActionWedding,
+} from "../../auth/get-active-wedding";
 import {
   AuthenticationRequiredError,
   getAuthenticatedUser,
@@ -16,9 +19,8 @@ import {
 import {
   isValidEmail,
   normalizeEmail,
-  weddingInvitationService,
-  WeddingInvitationServiceError,
-} from "../../services/wedding-invitation.service";
+  weddingMemberInvitationService,
+} from "../../services/workspace-invitation.service";
 
 export type WeddingActionResult<T> =
   | { success: true; data: T }
@@ -29,15 +31,15 @@ const MAX_PARTNER_NAME_LENGTH = 100;
 const MAX_TIMEZONE_LENGTH = 100;
 const MAX_LOCATION_LENGTH = 200;
 
-export type WeddingInvitationListItem = {
+export type WeddingMemberListItem = {
   id: string;
-  invitedEmail: string;
+  userId: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  profileImageUrl: string | null;
   role: string;
-  status: string;
-  expiresAt: string;
-  acceptedAt: string | null;
-  revokedAt: string | null;
-  createdAt: string;
+  joinedAt: string | null;
 };
 
 function failure<T = never>(error: string): WeddingActionResult<T> {
@@ -132,9 +134,9 @@ export async function createWedding(
 ): Promise<
   WeddingActionResult<{
     id: string;
-    invitationMessage?: string;
-    invitationId?: string;
-    developmentInvitationUrl?: string | null;
+    memberInvitationMessage?: string;
+    memberInvitationId?: string;
+    developmentWorkspaceInvitationUrl?: string | null;
   }>
 > {
   if (typeof input !== "object" || input === null || Array.isArray(input)) {
@@ -181,13 +183,13 @@ export async function createWedding(
     record.invitePartner !== undefined &&
     typeof record.invitePartner !== "boolean"
   ) {
-    return failure("Invitation preference is invalid.");
+    return failure("Workspace invitation preference is invalid.");
   }
 
   let partnerEmail: string | null = null;
   if (invitePartner) {
     if (typeof record.partnerEmail !== "string" || record.partnerEmail.trim().length === 0) {
-      return failure("Fiancé(e) email is required when an invitation is selected.");
+      return failure("Fiancé(e) email is required when a workspace invitation is selected.");
     }
 
     partnerEmail = normalizeEmail(record.partnerEmail);
@@ -200,7 +202,7 @@ export async function createWedding(
     const { user } = await getAuthenticatedUser();
 
     if (partnerEmail && normalizeEmail(user.email) === partnerEmail) {
-      return failure("The invitation email must be different from your own email.");
+      return failure("The workspace invitation email must be different from your own email.");
     }
 
     const wedding = await weddingRepository.createWeddingWithOwner({
@@ -217,26 +219,26 @@ export async function createWedding(
 
     await weddingRepository.setActiveWedding(user.id, wedding.id);
 
-    let invitationMessage: string | undefined;
-    let invitationId: string | undefined;
-    let developmentInvitationUrl: string | null | undefined;
+    let memberInvitationMessage: string | undefined;
+    let memberInvitationId: string | undefined;
+    let developmentWorkspaceInvitationUrl: string | null | undefined;
 
     if (partnerEmail) {
       try {
-        const invitation = await weddingInvitationService.createAndSend({
+        const memberInvitation = await weddingMemberInvitationService.createAndSend({
           weddingId: wedding.id,
           weddingName: wedding.name,
           invitedEmail: partnerEmail,
           invitedByUserId: user.id,
           inviterFirstName: user.firstName,
         });
-        invitationMessage = invitation.message;
-        invitationId = invitation.invitationId;
-        developmentInvitationUrl = invitation.developmentUrl;
+        memberInvitationMessage = memberInvitation.message;
+        memberInvitationId = memberInvitation.memberInvitationId;
+        developmentWorkspaceInvitationUrl = memberInvitation.developmentWorkspaceInvitationUrl;
       } catch (error) {
-        logger.error("[wedding] create invitation after wedding creation failed", error);
-        invitationMessage =
-          "Your wedding was created, but the invitation could not be created. You can send it later from Settings.";
+        logger.error("[wedding] create workspace invitation after wedding creation failed", error);
+        memberInvitationMessage =
+          "Your wedding was created, but the member invitation could not be created. You can send it later from Settings.";
       }
     }
 
@@ -248,9 +250,9 @@ export async function createWedding(
       success: true,
       data: {
         id: wedding.id,
-        invitationMessage,
-        invitationId,
-        developmentInvitationUrl,
+        memberInvitationMessage,
+        memberInvitationId,
+        developmentWorkspaceInvitationUrl,
       },
     };
   } catch (error) {
@@ -267,139 +269,39 @@ export async function createWedding(
   }
 }
 
-export async function createWeddingInvitation(
-  input: unknown,
-): Promise<WeddingActionResult<{
-  invitationId: string;
-  emailSent: boolean;
-  message: string;
-  developmentUrl: string | null;
-}>> {
-  if (typeof input !== "object" || input === null || Array.isArray(input)) {
-    return failure("Invalid invitation details.");
-  }
-
-  const email = (input as Record<string, unknown>).email;
-  if (typeof email !== "string" || !isValidEmail(email)) {
-    return failure("Enter a valid invitation email address.");
-  }
-
-  try {
-    const context = await requireOwner();
-    const invitedEmail = normalizeEmail(email);
-
-    if (invitedEmail === normalizeEmail(context.user.email)) {
-      return failure("The invitation email must be different from your own email.");
-    }
-
-    const invitation = await weddingInvitationService.createAndSend({
-      weddingId: context.wedding.id,
-      weddingName: context.wedding.name,
-      invitedEmail,
-      invitedByUserId: context.user.id,
-      inviterFirstName: context.user.firstName,
-    });
-
-    revalidatePath("/settings");
-
-    return {
-      success: true,
-      data: {
-        invitationId: invitation.invitationId,
-        emailSent: invitation.emailSent,
-        message: invitation.message,
-        developmentUrl: invitation.developmentUrl,
-      },
-    };
-  } catch (error) {
-    if (error instanceof PermissionDeniedError) return failure(error.message);
-    if (error instanceof WeddingInvitationServiceError) return failure(error.message);
-    if (error instanceof WeddingRepositoryError) return failure(error.message);
-
-    logger.error("[wedding] create invitation failed", error);
-    return failure("Unable to create invitation. Please try again.");
-  }
-}
-
-export async function listWeddingInvitations(): Promise<
-  WeddingActionResult<WeddingInvitationListItem[]>
+export async function listWeddingMembers(): Promise<
+  WeddingActionResult<WeddingMemberListItem[]>
 > {
   try {
-    const context = await requireOwner();
-    const invitations = await weddingInvitationService.list(context.wedding.id);
+    const context = await requireActionWedding();
+    const members = await weddingRepository.listActiveMembers(context.wedding.id);
 
     return {
       success: true,
-      data: invitations.map((invitation) => ({
-        id: invitation.id,
-        invitedEmail: invitation.invitedEmail,
-        role: invitation.role,
-        status: invitation.status,
-        expiresAt: invitation.expiresAt.toISOString(),
-        acceptedAt: invitation.acceptedAt?.toISOString() ?? null,
-        revokedAt: invitation.revokedAt?.toISOString() ?? null,
-        createdAt: invitation.createdAt.toISOString(),
+      data: members.map((member) => ({
+        id: member.id,
+        userId: member.user.id,
+        email: member.user.email,
+        firstName: member.user.firstName,
+        lastName: member.user.lastName,
+        profileImageUrl: member.user.profileImageUrl,
+        role: member.role,
+        joinedAt: member.joinedAt?.toISOString() ?? null,
       })),
     };
   } catch (error) {
-    if (error instanceof PermissionDeniedError) return failure(error.message);
-    if (error instanceof WeddingInvitationServiceError) return failure(error.message);
+    if (error instanceof AuthenticationRequiredError) {
+      return failure("Authentication is required.");
+    }
 
-    logger.error("[wedding] list invitations failed", error);
-    return failure("Unable to load invitations. Please try again.");
-  }
-}
+    if (error instanceof ActiveWeddingRequiredError) {
+      return failure("There is no active wedding.");
+    }
 
-export async function resendWeddingInvitation(
-  invitationId: unknown,
-): Promise<WeddingActionResult<{ message: string; developmentUrl: string | null }>> {
-  if (typeof invitationId !== "string" || invitationId.trim().length === 0) {
-    return failure("An invitation is required.");
-  }
+    if (error instanceof WeddingRepositoryError) return failure(error.message);
 
-  try {
-    const context = await requireOwner();
-    const invitation = await weddingInvitationService.resend({
-      id: invitationId,
-      weddingId: context.wedding.id,
-      weddingName: context.wedding.name,
-      invitedByUserId: context.user.id,
-      inviterFirstName: context.user.firstName,
-    });
-
-    revalidatePath("/settings");
-
-    return {
-      success: true,
-      data: { message: invitation.message, developmentUrl: invitation.developmentUrl },
-    };
-  } catch (error) {
-    if (error instanceof PermissionDeniedError) return failure(error.message);
-    if (error instanceof WeddingInvitationServiceError) return failure(error.message);
-
-    logger.error("[wedding] resend invitation failed", error);
-    return failure("Unable to resend invitation. Please try again.");
-  }
-}
-
-export async function revokeWeddingInvitation(
-  invitationId: unknown,
-): Promise<WeddingActionResult<null>> {
-  if (typeof invitationId !== "string" || invitationId.trim().length === 0) {
-    return failure("An invitation is required.");
-  }
-
-  try {
-    const context = await requireOwner();
-    await weddingInvitationService.revoke(invitationId, context.wedding.id);
-    revalidatePath("/settings");
-    return { success: true, data: null };
-  } catch (error) {
-    if (error instanceof PermissionDeniedError) return failure(error.message);
-    if (error instanceof WeddingInvitationServiceError) return failure(error.message);
-
-    logger.error("[wedding] revoke invitation failed", error);
-    return failure("Unable to revoke invitation. Please try again.");
+    logger.error("[wedding] list members failed", error);
+    return failure("Unable to load wedding members. Please try again.");
   }
 }
 

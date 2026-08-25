@@ -49,7 +49,6 @@ export function HouseholdForm({ household }: { household?: HouseholdData }) {
 
       setMessage(household ? "Household details saved." : "Household created.");
       if (!household) form.reset();
-      router.refresh();
     });
   }
 
@@ -66,7 +65,6 @@ export function HouseholdForm({ household }: { household?: HouseholdData }) {
 
       setIsDeleteOpen(false);
       router.push("/guests/households");
-      router.refresh();
     });
   }
 

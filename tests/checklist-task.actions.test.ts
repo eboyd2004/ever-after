@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   requireRole: vi.fn(),
   getTask: vi.fn(),
+  getTasksForWedding: vi.fn(),
   getCategory: vi.fn(),
   getWeddingMember: vi.fn(),
   updateTask: vi.fn(),
@@ -37,6 +38,7 @@ vi.mock("../src/server/repositories/checklist.repository", () => ({
   ChecklistRepositoryError: mocks.ChecklistRepositoryError,
   checklistRepository: {
     getTask: mocks.getTask,
+    getTasksForWedding: mocks.getTasksForWedding,
     getCategory: mocks.getCategory,
     getWeddingMember: mocks.getWeddingMember,
     updateTask: mocks.updateTask,
@@ -50,6 +52,7 @@ import { PermissionDeniedError } from "../src/server/auth/authorization";
 import {
   completeTask,
   deleteTask,
+  getTasksForWedding,
   reopenTask,
   updateTask,
 } from "../src/server/actions/checklist/checklist.actions";
@@ -94,6 +97,7 @@ describe("checklist task actions", () => {
       wedding: { id: "wedding_1" },
     });
     mocks.getTask.mockResolvedValue(task);
+    mocks.getTasksForWedding.mockResolvedValue([task]);
     mocks.getCategory.mockResolvedValue(task.category);
     mocks.getWeddingMember.mockResolvedValue({
       id: "member_1",
@@ -129,6 +133,20 @@ describe("checklist task actions", () => {
     });
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/checklist");
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/dashboard");
+  });
+
+  it("loads checklist tasks through the active wedding scope", async () => {
+    const result = await getTasksForWedding();
+
+    expect(result).toMatchObject({
+      success: true,
+      data: [expect.objectContaining({
+        id: "task_1",
+        weddingId: "wedding_1",
+        categoryId: "category_1",
+      })],
+    });
+    expect(mocks.getTasksForWedding).toHaveBeenCalledWith("wedding_1");
   });
 
   it("deletes a task only after the server action authorization check", async () => {

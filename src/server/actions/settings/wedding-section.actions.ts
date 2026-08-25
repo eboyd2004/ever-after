@@ -259,8 +259,6 @@ export async function deleteWeddingSection(
 }
 
 function revalidateSectionPaths() {
-  revalidatePath("/", "layout");
-  revalidatePath("/settings");
   revalidatePath("/settings/sections");
-  revalidatePath("/dashboard");
+  revalidatePath("/guests");
 }

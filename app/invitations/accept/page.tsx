@@ -9,15 +9,15 @@ import {
 } from "@/src/server/auth/get-authenticated-user";
 import { logger } from "@/src/server/logging/logger";
 import {
-  getInvitationReturnPath,
-  getPublicWeddingInvitation,
+  getWorkspaceInvitationReturnPath,
+  getPublicWorkspaceInvitation,
   normalizeEmail,
-  weddingInvitationService,
-} from "@/src/server/services/wedding-invitation.service";
+  weddingMemberInvitationService,
+} from "@/src/server/services/workspace-invitation.service";
 
 export const dynamic = "force-dynamic";
 
-export default async function InvitationAcceptancePage({
+export default async function WorkspaceInvitationAcceptancePage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -26,31 +26,31 @@ export default async function InvitationAcceptancePage({
   const tokenValue = Array.isArray(params.token) ? params.token[0] : params.token;
   const token = typeof tokenValue === "string" ? tokenValue : null;
 
-  if (!token) return <InvitationState title="Invitation link is invalid" message="This invitation link is missing its secure token." />;
+  if (!token) return <WorkspaceInvitationState title="Workspace invitation link is invalid" message="This workspace invitation link is missing its secure token." />;
 
-  let invitation;
+  let workspaceInvitation;
   try {
-    invitation = await getPublicWeddingInvitation(token);
+    workspaceInvitation = await getPublicWorkspaceInvitation(token);
   } catch (error) {
-    logger.error("[wedding-invitation] load public invitation failed", error);
-    return <InvitationState title="Invitation unavailable" message="We could not load this invitation right now. Please ask the wedding owner to send it again." />;
+    logger.error("[workspace-invitation] load public invitation failed", error);
+    return <WorkspaceInvitationState title="Workspace invitation unavailable" message="We could not load this workspace invitation right now. Please ask the wedding owner to send it again." />;
   }
 
-  if (invitation.state === "ACCEPTED" && invitation.acceptedByEmail) {
+  if (workspaceInvitation.state === "ACCEPTED" && workspaceInvitation.acceptedByEmail) {
     try {
       const { user } = await getAuthenticatedUser();
-      if (normalizeEmail(user.email) === normalizeEmail(invitation.acceptedByEmail)) {
+      if (normalizeEmail(user.email) === normalizeEmail(workspaceInvitation.acceptedByEmail)) {
         redirect("/dashboard?invitation=already-complete");
       }
     } catch (error) {
       if (!(error instanceof AuthenticationRequiredError)) {
-        logger.error("[wedding-invitation] accepted invitation identity check failed", error);
+        logger.error("[workspace-invitation] accepted invitation identity check failed", error);
       }
     }
   }
 
-  if (invitation.state !== "PENDING") {
-    return <InvitationState {...getStateCopy(invitation.state)} />;
+  if (workspaceInvitation.state !== "PENDING") {
+    return <WorkspaceInvitationState {...getWorkspaceInvitationStateCopy(workspaceInvitation.state)} />;
   }
 
   let authenticated = false;
@@ -59,32 +59,32 @@ export default async function InvitationAcceptancePage({
     authenticated = true;
   } catch (error) {
     if (!(error instanceof AuthenticationRequiredError)) {
-      logger.error("[wedding-invitation] authenticated invitation check failed", error);
-      return <InvitationState title="Account verification required" message="Finish verifying your Tied Forever account before accepting this invitation." />;
+      logger.error("[workspace-invitation] authenticated invitation check failed", error);
+      return <WorkspaceInvitationState title="Account verification required" message="Finish verifying your Tied Forever account before accepting this workspace invitation." />;
     }
   }
 
-  const returnPath = getInvitationReturnPath(token);
+  const returnPath = getWorkspaceInvitationReturnPath(token);
   if (!returnPath) {
-    return <InvitationState title="Invitation link is invalid" message="This invitation link is not valid." />;
+    return <WorkspaceInvitationState title="Workspace invitation link is invalid" message="This workspace invitation link is not valid." />;
   }
 
   if (!authenticated) {
-    const query = `redirect_url=${encodeURIComponent(returnPath)}&email=${encodeURIComponent(invitation.invitedEmail ?? "")}`;
+    const query = `redirect_url=${encodeURIComponent(returnPath)}&email=${encodeURIComponent(workspaceInvitation.invitedEmail ?? "")}`;
 
     return (
-      <InvitationLayout>
+      <WorkspaceInvitationLayout>
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#2D5A27]">
-          You&apos;re invited
+          Workspace invitation
         </p>
         <h1 className="mt-2 font-serif text-3xl tracking-[-0.03em] text-[#1C1C1C]">
-          Join {invitation.weddingName}
+          Join the {workspaceInvitation.weddingName} workspace
         </h1>
         <p className="mt-3 text-sm leading-6 text-[#7A7A6E]">
-          {invitation.inviterName} invited you to join their private Tied Forever wedding workspace as an owner.
+          {workspaceInvitation.inviterName} invited you to join their private Tied Forever wedding workspace as an OWNER.
         </p>
         <p className="mt-4 rounded-lg bg-[#FBF5E6] px-3 py-2 text-sm text-[#6B5630]">
-          This invitation was issued to <strong>{invitation.invitedEmail}</strong> and expires on {formatDate(invitation.expiresAt)}.
+          This workspace invitation was issued to <strong>{workspaceInvitation.invitedEmail}</strong> and expires on {formatDate(workspaceInvitation.expiresAt)}.
         </p>
         <div className="mt-7 grid gap-3 sm:grid-cols-2">
           <Link className="rounded-[10px] bg-[#2D5A27] px-4 py-3 text-center text-sm font-semibold text-white hover:bg-[#245020]" href={`/sign-up?${query}`}>
@@ -94,16 +94,16 @@ export default async function InvitationAcceptancePage({
             Sign in
           </Link>
         </div>
-      </InvitationLayout>
+      </WorkspaceInvitationLayout>
     );
   }
 
   let result;
   try {
-    result = await weddingInvitationService.accept(token);
+    result = await weddingMemberInvitationService.accept(token);
   } catch (error) {
-    logger.error("[wedding-invitation] accept invitation failed", error);
-    return <InvitationState title="Invitation could not be accepted" message="Please try again or ask the wedding owner to resend the invitation." />;
+    logger.error("[workspace-invitation] accept invitation failed", error);
+    return <WorkspaceInvitationState title="Workspace invitation could not be accepted" message="Please try again or ask the wedding owner to resend the workspace invitation." />;
   }
 
   if (result.ok) {
@@ -112,15 +112,15 @@ export default async function InvitationAcceptancePage({
 
   if (result.code === "EMAIL_MISMATCH") {
     return (
-      <InvitationLayout>
+      <WorkspaceInvitationLayout>
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9D3F32]">
           Different account
         </p>
         <h1 className="mt-2 font-serif text-3xl tracking-[-0.03em] text-[#1C1C1C]">
-          This invitation belongs to another email
+          This workspace invitation belongs to another email
         </h1>
         <p className="mt-3 text-sm leading-6 text-[#7A7A6E]">
-          Sign in with the verified email address that received this invitation: {result.maskedEmail}.
+          Sign in with the verified email address that received this workspace invitation: {result.maskedEmail}.
         </p>
         <div className="mt-7 flex flex-wrap gap-3">
           <SignOutControl />
@@ -128,14 +128,14 @@ export default async function InvitationAcceptancePage({
             Return to dashboard
           </Link>
         </div>
-      </InvitationLayout>
+      </WorkspaceInvitationLayout>
     );
   }
 
-  return <InvitationState {...getStateCopy(result.code)} />;
+  return <WorkspaceInvitationState {...getWorkspaceInvitationStateCopy(result.code)} />;
 }
 
-function InvitationLayout({ children }: { children: ReactNode }) {
+function WorkspaceInvitationLayout({ children }: { children: ReactNode }) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#FAFAF8] px-5 py-12">
       <section className="w-full max-w-xl rounded-[20px] border border-[#E4E0D4] bg-white p-7 shadow-[0_4px_16px_rgba(0,0,0,0.06)] sm:p-10">
@@ -148,31 +148,31 @@ function InvitationLayout({ children }: { children: ReactNode }) {
   );
 }
 
-function InvitationState({ title, message }: { title: string; message: string }) {
+function WorkspaceInvitationState({ title, message }: { title: string; message: string }) {
   return (
-    <InvitationLayout>
+    <WorkspaceInvitationLayout>
       <p className="mt-8 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9D3F32]">
-        Wedding invitation
+        Workspace invitation
       </p>
       <h1 className="mt-2 font-serif text-3xl tracking-[-0.03em] text-[#1C1C1C]">{title}</h1>
       <p className="mt-3 text-sm leading-6 text-[#7A7A6E]">{message}</p>
       <Link className="mt-7 inline-flex rounded-[10px] bg-[#2D5A27] px-4 py-2.5 text-sm font-semibold text-white" href="/">
         Return to Tied Forever
       </Link>
-    </InvitationLayout>
+    </WorkspaceInvitationLayout>
   );
 }
 
-function getStateCopy(state: string) {
+function getWorkspaceInvitationStateCopy(state: string) {
   switch (state) {
     case "ACCEPTED":
-      return { title: "Invitation already used", message: "This invitation has already been accepted." };
+      return { title: "Workspace invitation already used", message: "This workspace invitation has already been accepted." };
     case "EXPIRED":
-      return { title: "Invitation expired", message: "Ask the wedding owner to send a new invitation." };
+      return { title: "Workspace invitation expired", message: "Ask the wedding owner to send a new workspace invitation." };
     case "REVOKED":
-      return { title: "Invitation revoked", message: "This invitation is no longer active. Ask the wedding owner to send a new one." };
+      return { title: "Workspace invitation revoked", message: "This workspace invitation is no longer active. Ask the wedding owner to send a new one." };
     default:
-      return { title: "Invitation link is invalid", message: "This invitation link is not valid." };
+      return { title: "Workspace invitation link is invalid", message: "This workspace invitation link is not valid." };
   }
 }
 

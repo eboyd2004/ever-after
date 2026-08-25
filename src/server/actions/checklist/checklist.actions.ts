@@ -838,6 +838,18 @@ export async function getAssignableMembers(): Promise<
   });
 }
 
+export async function getTasksForWedding(): Promise<
+  ActionResult<TaskActionData[]>
+> {
+  return runAction("load wedding tasks", "read", async (context) => {
+    const tasks = await checklistRepository.getTasksForWedding(
+      context.wedding.id,
+    );
+
+    return tasks.map(mapTask);
+  });
+}
+
 export async function createCategory(
   input: unknown,
 ): Promise<ActionResult<CategoryActionData>> {

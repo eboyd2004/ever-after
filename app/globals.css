@@ -99,7 +99,7 @@ textarea {
 
 .page-transition {
   opacity: 0;
-  transition: opacity 240ms ease-out;
+  transition: opacity 100ms ease-out;
 }
 
 .page-transition-visible {

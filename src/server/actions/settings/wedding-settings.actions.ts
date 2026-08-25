@@ -244,7 +244,7 @@ export async function updateWeddingGeneralSettings(
       dietaryRequirementsEnabled,
     });
 
-    revalidateSettingsPaths();
+    revalidateGeneralSettingsPaths();
     return mapGeneralSettings(wedding);
   });
 }
@@ -283,15 +283,19 @@ export async function updateWeddingLocations(
       receptionLocation,
     });
 
-    revalidateSettingsPaths();
+    revalidateLocationSettingsPaths();
     return mapLocations(wedding);
   });
 }
 
-function revalidateSettingsPaths() {
+function revalidateGeneralSettingsPaths() {
   revalidatePath("/", "layout");
   revalidatePath("/settings");
   revalidatePath("/settings/general");
+  revalidatePath("/dashboard");
+}
+
+function revalidateLocationSettingsPaths() {
   revalidatePath("/settings/locations");
   revalidatePath("/dashboard");
 }

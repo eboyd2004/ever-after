@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 import {
@@ -24,7 +23,6 @@ export function HouseholdMembers({
   guestsWithoutHousehold: GuestActionData[];
   canEdit?: boolean;
 }) {
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [selectedGuestIds, setSelectedGuestIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -48,7 +46,6 @@ export function HouseholdMembers({
         return;
       }
       setSelectedGuestIds([]);
-      router.refresh();
     });
   }
 
@@ -84,7 +81,6 @@ export function HouseholdMembers({
         return;
       }
       setConfirmation(null);
-      router.refresh();
     });
   }
 

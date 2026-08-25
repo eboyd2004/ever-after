@@ -2,13 +2,14 @@ import "server-only";
 
 import {
   MembershipStatus,
-  WeddingInvitationStatus,
+  WeddingInvitationStatus as WeddingMemberInvitationStatus,
   WeddingMemberRole,
 } from "../../../app/generated/prisma/client";
+import type { WeddingInvitation as WeddingInvitationRecord } from "../../../app/generated/prisma/client";
 import { prisma } from "../db/prisma";
 import { logger } from "../logging/logger";
 
-export type CreateWeddingInvitationInput = {
+export type CreateWeddingMemberInvitationInput = {
   weddingId: string;
   invitedEmail: string;
   role: WeddingMemberRole;
@@ -17,28 +18,30 @@ export type CreateWeddingInvitationInput = {
   invitedByUserId: string;
 };
 
-export class WeddingInvitationRepositoryError extends Error {
+export type WeddingMemberInvitation = WeddingInvitationRecord;
+
+export class WeddingMemberInvitationRepositoryError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "WeddingInvitationRepositoryError";
+    this.name = "WeddingMemberInvitationRepositoryError";
   }
 }
 
-export type WeddingInvitationAcceptanceFailureCode =
+export type WeddingMemberInvitationAcceptanceFailureCode =
   | "INVALID"
   | "EMAIL_MISMATCH";
 
-export class WeddingInvitationAcceptanceError extends WeddingInvitationRepositoryError {
+export class WeddingMemberInvitationAcceptanceError extends WeddingMemberInvitationRepositoryError {
   constructor(
     message: string,
-    readonly code: WeddingInvitationAcceptanceFailureCode,
+    readonly code: WeddingMemberInvitationAcceptanceFailureCode,
   ) {
     super(message);
-    this.name = "WeddingInvitationAcceptanceError";
+    this.name = "WeddingMemberInvitationAcceptanceError";
   }
 }
 
-const invitationInclude = {
+const workspaceInvitationInclude = {
   wedding: true,
   invitedBy: {
     select: { firstName: true, lastName: true, email: true },
@@ -52,16 +55,19 @@ function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
-export class WeddingInvitationRepository {
+// The persisted Prisma model remains WeddingInvitation for migration and
+// database compatibility. This repository exposes it as the workspace/member
+// invitation domain so future GuestInvitation code has a separate boundary.
+export class WeddingMemberInvitationRepository {
   async findByTokenHash(tokenHash: string) {
     try {
       return await prisma.weddingInvitation.findUnique({
         where: { tokenHash },
-        include: invitationInclude,
+        include: workspaceInvitationInclude,
       });
     } catch (error) {
-      logger.error("[wedding-invitation-repository] find invitation failed", error);
-      throw new WeddingInvitationRepositoryError("Unable to find wedding invitation");
+      logger.error("[workspace-invitation-repository] find workspace invitation failed", error);
+      throw new WeddingMemberInvitationRepositoryError("Unable to find workspace invitation");
     }
   }
 
@@ -71,36 +77,65 @@ export class WeddingInvitationRepository {
         where: {
           weddingId,
           invitedEmail,
-          status: WeddingInvitationStatus.PENDING,
+          status: WeddingMemberInvitationStatus.PENDING,
         },
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        include: invitationInclude,
+        include: workspaceInvitationInclude,
       });
     } catch (error) {
-      logger.error("[wedding-invitation-repository] find pending invitation failed", error);
-      throw new WeddingInvitationRepositoryError(
-        "Unable to check existing wedding invitations",
+      logger.error("[workspace-invitation-repository] find pending invitation failed", error);
+      throw new WeddingMemberInvitationRepositoryError(
+        "Unable to check existing workspace invitations",
       );
     }
   }
 
-  async create(input: CreateWeddingInvitationInput) {
+  async findActiveMemberByWeddingAndEmail(
+    weddingId: string,
+    invitedEmail: string,
+  ) {
+    try {
+      return await prisma.weddingMember.findFirst({
+        where: {
+          weddingId,
+          status: MembershipStatus.ACTIVE,
+          user: {
+            email: {
+              equals: normalizeEmail(invitedEmail),
+              mode: "insensitive",
+            },
+          },
+        },
+        select: { id: true },
+      });
+    } catch (error) {
+      logger.error(
+        "[workspace-invitation-repository] find active member by email failed",
+        error,
+      );
+      throw new WeddingMemberInvitationRepositoryError(
+        "Unable to check existing wedding members",
+      );
+    }
+  }
+
+  async create(input: CreateWeddingMemberInvitationInput) {
     try {
       return await prisma.weddingInvitation.create({
         data: {
           weddingId: input.weddingId,
           invitedEmail: input.invitedEmail,
           role: input.role,
-          status: WeddingInvitationStatus.PENDING,
+          status: WeddingMemberInvitationStatus.PENDING,
           tokenHash: input.tokenHash,
           expiresAt: input.expiresAt,
           invitedByUserId: input.invitedByUserId,
         },
-        include: invitationInclude,
+        include: workspaceInvitationInclude,
       });
     } catch (error) {
-      logger.error("[wedding-invitation-repository] create invitation failed", error);
-      throw new WeddingInvitationRepositoryError("Unable to create wedding invitation");
+      logger.error("[workspace-invitation-repository] create invitation failed", error);
+      throw new WeddingMemberInvitationRepositoryError("Unable to create workspace invitation");
     }
   }
 
@@ -108,11 +143,11 @@ export class WeddingInvitationRepository {
     try {
       return await prisma.weddingInvitation.findFirst({
         where: { id, weddingId },
-        include: invitationInclude,
+        include: workspaceInvitationInclude,
       });
     } catch (error) {
-      logger.error("[wedding-invitation-repository] load wedding invitation failed", error);
-      throw new WeddingInvitationRepositoryError("Unable to load wedding invitation");
+      logger.error("[workspace-invitation-repository] load workspace invitation failed", error);
+      throw new WeddingMemberInvitationRepositoryError("Unable to load workspace invitation");
     }
   }
 
@@ -133,8 +168,8 @@ export class WeddingInvitationRepository {
         },
       });
     } catch (error) {
-      logger.error("[wedding-invitation-repository] list invitations failed", error);
-      throw new WeddingInvitationRepositoryError("Unable to list wedding invitations");
+      logger.error("[workspace-invitation-repository] list invitations failed", error);
+      throw new WeddingMemberInvitationRepositoryError("Unable to list workspace invitations");
     }
   }
 
@@ -143,16 +178,16 @@ export class WeddingInvitationRepository {
       const result = await prisma.weddingInvitation.updateMany({
         where: {
           id,
-          status: WeddingInvitationStatus.PENDING,
+          status: WeddingMemberInvitationStatus.PENDING,
           expiresAt: { lte: now },
         },
-        data: { status: WeddingInvitationStatus.EXPIRED },
+        data: { status: WeddingMemberInvitationStatus.EXPIRED },
       });
 
       return result.count > 0;
     } catch (error) {
-      logger.error("[wedding-invitation-repository] expire invitation failed", error);
-      throw new WeddingInvitationRepositoryError("Unable to update wedding invitation");
+      logger.error("[workspace-invitation-repository] expire invitation failed", error);
+      throw new WeddingMemberInvitationRepositoryError("Unable to update workspace invitation");
     }
   }
 
@@ -162,18 +197,18 @@ export class WeddingInvitationRepository {
         where: {
           id,
           weddingId,
-          status: WeddingInvitationStatus.PENDING,
+          status: WeddingMemberInvitationStatus.PENDING,
         },
         data: {
-          status: WeddingInvitationStatus.REVOKED,
+          status: WeddingMemberInvitationStatus.REVOKED,
           revokedAt: new Date(),
         },
       });
 
       return result.count > 0;
     } catch (error) {
-      logger.error("[wedding-invitation-repository] revoke invitation failed", error);
-      throw new WeddingInvitationRepositoryError("Unable to revoke wedding invitation");
+      logger.error("[workspace-invitation-repository] revoke invitation failed", error);
+      throw new WeddingMemberInvitationRepositoryError("Unable to revoke workspace invitation");
     }
   }
 
@@ -185,6 +220,7 @@ export class WeddingInvitationRepository {
     try {
       return await prisma.$transaction(async (tx) => {
         const now = new Date();
+        const acceptedRole = WeddingMemberRole.OWNER;
         const invitation = await tx.weddingInvitation.findUnique({
           where: { id: input.id },
           select: {
@@ -198,8 +234,8 @@ export class WeddingInvitationRepository {
         });
 
         if (!invitation || invitation.weddingId !== input.weddingId) {
-          throw new WeddingInvitationAcceptanceError(
-            "This invitation is no longer valid.",
+          throw new WeddingMemberInvitationAcceptanceError(
+            "This workspace invitation is no longer valid.",
             "INVALID",
           );
         }
@@ -210,29 +246,29 @@ export class WeddingInvitationRepository {
         });
 
         if (!user) {
-          throw new WeddingInvitationAcceptanceError(
-            "This invitation is no longer valid.",
+          throw new WeddingMemberInvitationAcceptanceError(
+            "This workspace invitation is no longer valid.",
             "INVALID",
           );
         }
 
-        if (invitation.status === WeddingInvitationStatus.ACCEPTED) {
+        if (invitation.status === WeddingMemberInvitationStatus.ACCEPTED) {
           if (invitation.acceptedByUserId === input.userId) {
             return { alreadyMember: true, alreadyAccepted: true };
           }
 
-          throw new WeddingInvitationAcceptanceError(
-            "This invitation is no longer valid.",
+          throw new WeddingMemberInvitationAcceptanceError(
+            "This workspace invitation is no longer valid.",
             "INVALID",
           );
         }
 
         if (
-          invitation.status !== WeddingInvitationStatus.PENDING ||
+          invitation.status !== WeddingMemberInvitationStatus.PENDING ||
           invitation.expiresAt <= now
         ) {
-          throw new WeddingInvitationAcceptanceError(
-            "This invitation is no longer valid.",
+          throw new WeddingMemberInvitationAcceptanceError(
+            "This workspace invitation is no longer valid.",
             "INVALID",
           );
         }
@@ -240,8 +276,8 @@ export class WeddingInvitationRepository {
         if (
           normalizeEmail(user.email) !== normalizeEmail(invitation.invitedEmail)
         ) {
-          throw new WeddingInvitationAcceptanceError(
-            "This invitation belongs to a different verified email address.",
+          throw new WeddingMemberInvitationAcceptanceError(
+            "This workspace invitation belongs to a different verified email address.",
             "EMAIL_MISMATCH",
           );
         }
@@ -251,19 +287,19 @@ export class WeddingInvitationRepository {
             id: input.id,
             weddingId: input.weddingId,
             invitedEmail: invitation.invitedEmail,
-            status: WeddingInvitationStatus.PENDING,
+            status: WeddingMemberInvitationStatus.PENDING,
             expiresAt: { gt: now },
           },
           data: {
-            status: WeddingInvitationStatus.ACCEPTED,
+            status: WeddingMemberInvitationStatus.ACCEPTED,
             acceptedByUserId: input.userId,
             acceptedAt: now,
           },
         });
 
         if (invitationClaim.count !== 1) {
-          throw new WeddingInvitationAcceptanceError(
-            "This invitation is no longer valid.",
+          throw new WeddingMemberInvitationAcceptanceError(
+            "This workspace invitation is no longer valid.",
             "INVALID",
           );
         }
@@ -284,18 +320,23 @@ export class WeddingInvitationRepository {
           await tx.weddingMember.update({
             where: { id: existingMembership.id },
             data: {
-              role: invitation.role,
+              role: acceptedRole,
               status: MembershipStatus.ACTIVE,
               joinedAt: now,
               leftAt: null,
             },
+          });
+        } else if (existingMembership) {
+          await tx.weddingMember.update({
+            where: { id: existingMembership.id },
+            data: { role: acceptedRole },
           });
         } else {
           await tx.weddingMember.create({
             data: {
               weddingId: input.weddingId,
               userId: input.userId,
-              role: invitation.role,
+              role: acceptedRole,
               status: MembershipStatus.ACTIVE,
               joinedAt: now,
             },
@@ -318,14 +359,14 @@ export class WeddingInvitationRepository {
         return { alreadyMember, alreadyAccepted: false };
       });
     } catch (error) {
-      if (error instanceof WeddingInvitationAcceptanceError) {
+      if (error instanceof WeddingMemberInvitationAcceptanceError) {
         throw error;
       }
 
-      logger.error("[wedding-invitation-repository] accept invitation failed", error);
-      throw new WeddingInvitationRepositoryError("Unable to accept wedding invitation");
+      logger.error("[workspace-invitation-repository] accept invitation failed", error);
+      throw new WeddingMemberInvitationRepositoryError("Unable to accept workspace invitation");
     }
   }
 }
 
-export const weddingInvitationRepository = new WeddingInvitationRepository();
+export const weddingMemberInvitationRepository = new WeddingMemberInvitationRepository();

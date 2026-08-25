@@ -2,12 +2,12 @@ import Link from "next/link";
 
 import { SignOutControl } from "@/src/components/auth/sign-out-button";
 import { DeleteWeddingForm } from "@/src/components/settings/delete-wedding-form";
-import { InvitationManagement } from "@/src/components/settings/invitation-management";
+import { WorkspaceInvitationManagement } from "@/src/components/settings/workspace-invitation-management";
 import { WeddingRequiredState } from "@/src/components/shared/wedding-required-state";
 import { Card } from "@/src/components/shared/ui";
 import { getWeddingPageContext } from "@/src/server/auth/get-wedding-page-context";
 import { getAuthenticatedUser } from "@/src/server/auth/get-authenticated-user";
-import { listWeddingInvitations } from "@/src/server/actions/wedding/wedding.actions";
+import { listWeddingMemberInvitations } from "@/src/server/actions/wedding/workspace-invitation.actions";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,7 @@ export default async function SettingsPage() {
   const context = await getWeddingPageContext();
   const user = context?.user ?? (await getAuthenticatedUser()).user;
   const isOwner = context?.role === "OWNER";
-  const invitationResult = isOwner ? await listWeddingInvitations() : null;
+  const memberInvitationResult = isOwner ? await listWeddingMemberInvitations() : null;
 
   return (
     <div className="space-y-8">
@@ -57,8 +57,8 @@ export default async function SettingsPage() {
 
       {isOwner && context ? (
         <Card className="p-5 sm:p-6">
-          <InvitationManagement
-            initialInvitations={invitationResult?.success ? invitationResult.data : []}
+          <WorkspaceInvitationManagement
+            initialMemberInvitations={memberInvitationResult?.success ? memberInvitationResult.data : []}
           />
         </Card>
       ) : null}

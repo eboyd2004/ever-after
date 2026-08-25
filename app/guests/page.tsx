@@ -51,24 +51,26 @@ export default async function GuestsPage({
     return <GuestPageError message={parsedFilters.error} />;
   }
 
-  let guestList;
-  try {
-    guestList = await guestListRepository.getGuestList(
-      context.wedding.id,
-      parsedFilters.value,
-    );
-  } catch (error) {
-    const message = error instanceof GuestListRepositoryError
-      ? error.message
+  const [guestListResult, sectionsResult] = await Promise.all([
+    guestListRepository
+      .getGuestList(context.wedding.id, parsedFilters.value)
+      .then((data) => ({ data }))
+      .catch((error: unknown) => ({ error })),
+    getWeddingSections(),
+  ]);
+
+  if ("error" in guestListResult) {
+    const message = guestListResult.error instanceof GuestListRepositoryError
+      ? guestListResult.error.message
       : "Unable to load guest data.";
     return <GuestPageError message={message} />;
   }
 
-  const sectionsResult = await getWeddingSections();
   if (!sectionsResult.success) {
     return <GuestPageError message={sectionsResult.error} />;
   }
 
+  const guestList = guestListResult.data;
   const { standaloneGuests, households, tags } = guestList;
   const activeSections = sectionsResult.data.filter((section) => section.active);
   const householdGuests = households.flatMap((household) => household.guests);

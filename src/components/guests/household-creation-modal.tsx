@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useRef, useState, useTransition, type ChangeEvent } from "react";
-import { useRouter } from "next/navigation";
 
 import {
   createHouseholdWithMembers,
@@ -51,7 +50,6 @@ export function HouseholdCreationModal({
   tags: HouseholdListTag[];
 }) {
   const formRef = useRef<HTMLFormElement>(null);
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [memberCount, setMemberCount] = useState(1);
@@ -130,7 +128,6 @@ export function HouseholdCreationModal({
 
       reset();
       onClose();
-      router.refresh();
     });
   }
 

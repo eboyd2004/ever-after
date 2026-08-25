@@ -10,7 +10,7 @@ import type {
   Task,
   User,
   UserPreference,
-  WeddingInvitation,
+  WeddingInvitation as WeddingMemberInvitationRecord,
   WeddingMember,
 } from "../../../app/generated/prisma/client";
 import { prisma } from "../db/prisma";
@@ -40,8 +40,8 @@ type AccountDeletionSnapshot = {
   user: User;
   preference: UserPreference | null;
   memberships: WeddingMember[];
-  sentInvitations: WeddingInvitation[];
-  acceptedInvitationIds: string[];
+  sentMemberInvitations: WeddingMemberInvitationRecord[];
+  acceptedMemberInvitationIds: string[];
   assignedTasks: AssignedTaskSnapshot[];
 };
 
@@ -59,9 +59,9 @@ export class AccountDeletionService {
         await tx.weddingMember.createMany({ data: snapshot.memberships });
       }
 
-      if (snapshot.sentInvitations.length > 0) {
+      if (snapshot.sentMemberInvitations.length > 0) {
         await tx.weddingInvitation.createMany({
-          data: snapshot.sentInvitations,
+          data: snapshot.sentMemberInvitations,
         });
       }
 
@@ -75,9 +75,9 @@ export class AccountDeletionService {
         });
       }
 
-      if (snapshot.acceptedInvitationIds.length > 0) {
+      if (snapshot.acceptedMemberInvitationIds.length > 0) {
         await tx.weddingInvitation.updateMany({
-          where: { id: { in: snapshot.acceptedInvitationIds } },
+          where: { id: { in: snapshot.acceptedMemberInvitationIds } },
           data: { acceptedByUserId: snapshot.user.id },
         });
       }
@@ -130,7 +130,7 @@ export class AccountDeletionService {
         });
         const membershipIds = memberships.map(({ id }) => id);
 
-        const [preference, sentInvitations, acceptedInvitations, assignedTasks] =
+        const [preference, sentMemberInvitations, acceptedMemberInvitations, assignedTasks] =
           await Promise.all([
             tx.userPreference.findUnique({ where: { userId } }),
             tx.weddingInvitation.findMany({ where: { invitedByUserId: userId } }),
@@ -166,8 +166,8 @@ export class AccountDeletionService {
           user: applicationUser,
           preference,
           memberships,
-          sentInvitations,
-          acceptedInvitationIds: acceptedInvitations.map(({ id }) => id),
+          sentMemberInvitations,
+          acceptedMemberInvitationIds: acceptedMemberInvitations.map(({ id }) => id),
           assignedTasks,
         };
       });

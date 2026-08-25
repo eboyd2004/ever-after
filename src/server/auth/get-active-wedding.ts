@@ -27,10 +27,27 @@ export type AvailableWedding = {
   timezone: string;
 };
 
+type ActiveWeddingData = Pick<
+  Wedding,
+  | "id"
+  | "name"
+  | "partnerOneName"
+  | "partnerTwoName"
+  | "weddingDate"
+  | "ceremonyLocation"
+  | "receptionLocation"
+  | "timezone"
+>;
+
+type ActiveWeddingMembership = Pick<
+  WeddingMember,
+  "id" | "weddingId" | "userId" | "role" | "status"
+>;
+
 export type ActiveWeddingContext = {
   user: User;
-  wedding: Wedding;
-  membership: WeddingMember;
+  wedding: ActiveWeddingData;
+  membership: ActiveWeddingMembership;
   role: WeddingMemberRole;
   availableWeddings: AvailableWedding[];
 };
@@ -51,31 +68,46 @@ const resolveActiveWedding = cache(
   async (): Promise<ActiveWeddingContext | null> =>
     measurePerformance("activeWedding.total", async () => {
       const authenticatedUser = await getAuthenticatedUser();
-      const memberships = await measurePerformance(
-        "activeWedding.memberships",
-        () =>
+      const [memberships, preference] = await Promise.all([
+        measurePerformance("activeWedding.memberships", () =>
           prisma.weddingMember.findMany({
             where: {
               userId: authenticatedUser.user.id,
               status: MembershipStatus.ACTIVE,
             },
-            include: { wedding: true },
+            select: {
+              id: true,
+              weddingId: true,
+              userId: true,
+              role: true,
+              status: true,
+              wedding: {
+                select: {
+                  id: true,
+                  name: true,
+                  partnerOneName: true,
+                  partnerTwoName: true,
+                  weddingDate: true,
+                  ceremonyLocation: true,
+                  receptionLocation: true,
+                  timezone: true,
+                },
+              },
+            },
             orderBy: [{ createdAt: "asc" }, { id: "asc" }],
           }),
-      );
-
-      if (memberships.length === 0) {
-        return null;
-      }
-
-      const preference = await measurePerformance(
-        "activeWedding.preference",
-        () =>
+        ),
+        measurePerformance("activeWedding.preference", () =>
           prisma.userPreference.findUnique({
             where: { userId: authenticatedUser.user.id },
             select: { activeWeddingId: true },
           }),
-      );
+        ),
+      ]);
+
+      if (memberships.length === 0) {
+        return null;
+      }
 
       const selectedMembership =
         memberships.find(

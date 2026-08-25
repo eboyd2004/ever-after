@@ -12,14 +12,14 @@ export function CreateWeddingForm() {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [developmentInvitationUrl, setDevelopmentInvitationUrl] = useState<string | null>(null);
+  const [developmentWorkspaceInvitationUrl, setDevelopmentWorkspaceInvitationUrl] = useState<string | null>(null);
   const [invitePartner, setInvitePartner] = useState(false);
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
     setSuccess(null);
-    setDevelopmentInvitationUrl(null);
+    setDevelopmentWorkspaceInvitationUrl(null);
 
     const formData = new FormData(event.currentTarget);
     const input = {
@@ -45,22 +45,21 @@ export function CreateWeddingForm() {
 
       formRef.current?.reset();
 
-      if (result.data.invitationMessage) {
-        setSuccess(result.data.invitationMessage);
-        setDevelopmentInvitationUrl(result.data.developmentInvitationUrl ?? null);
+      if (result.data.memberInvitationMessage) {
+        setSuccess(result.data.memberInvitationMessage);
+        setDevelopmentWorkspaceInvitationUrl(result.data.developmentWorkspaceInvitationUrl ?? null);
         setInvitePartner(false);
         return;
       }
 
       router.push("/dashboard");
-      router.refresh();
     });
   }
 
   function handleSkip() {
     setError(null);
     setSuccess(null);
-    setDevelopmentInvitationUrl(null);
+    setDevelopmentWorkspaceInvitationUrl(null);
 
     startTransition(async () => {
       const result = await skipOnboarding();
@@ -71,7 +70,6 @@ export function CreateWeddingForm() {
       }
 
       router.push("/dashboard");
-      router.refresh();
     });
   }
 
@@ -193,7 +191,7 @@ export function CreateWeddingForm() {
             type="checkbox"
           />
           <span>
-            Yes, send them an invitation to join this private wedding workspace as an owner.
+            Yes, send them a workspace member invitation to join this private wedding workspace as an OWNER.
           </span>
         </label>
         {invitePartner ? (
@@ -221,12 +219,12 @@ export function CreateWeddingForm() {
       {success ? (
         <div className="rounded-lg bg-[#EAF0E8] px-3 py-3 text-sm text-[#2D5A27]">
           <p aria-live="polite">{success}</p>
-          {developmentInvitationUrl ? (
+          {developmentWorkspaceInvitationUrl ? (
             <a
               className="mt-2 inline-block break-all font-medium underline"
-              href={developmentInvitationUrl}
+              href={developmentWorkspaceInvitationUrl}
             >
-              Open development invitation link
+              Open development workspace invitation link
             </a>
           ) : null}
           <button

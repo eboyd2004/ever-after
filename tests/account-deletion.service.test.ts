@@ -37,7 +37,7 @@ const snapshot = {
       updatedAt: new Date("2026-01-01T00:00:00.000Z"),
     },
   ],
-  sentInvitations: [
+  sentMemberInvitations: [
     {
       id: "invitation_1",
       weddingId: "wedding_1",
@@ -54,7 +54,7 @@ const snapshot = {
       updatedAt: new Date("2026-01-01T00:00:00.000Z"),
     },
   ],
-  acceptedInvitationIds: ["accepted_invitation_1"],
+  acceptedMemberInvitationIds: ["accepted_invitation_1"],
   assignedTasks: [{ id: "task_1", assigneeId: "membership_1" }],
 };
 
@@ -118,9 +118,9 @@ describe("accountDeletionService", () => {
     mocks.tx.weddingMember.findMany.mockResolvedValue(snapshot.memberships);
     mocks.tx.userPreference.findUnique.mockResolvedValue(snapshot.preference);
     mocks.tx.weddingInvitation.findMany
-      .mockResolvedValueOnce(snapshot.sentInvitations)
+      .mockResolvedValueOnce(snapshot.sentMemberInvitations)
       .mockResolvedValueOnce(
-        snapshot.acceptedInvitationIds.map((id) => ({ id })),
+        snapshot.acceptedMemberInvitationIds.map((id) => ({ id })),
       );
     mocks.tx.task.findMany.mockResolvedValue(snapshot.assignedTasks);
     mocks.tx.weddingInvitation.deleteMany.mockResolvedValue({ count: 1 });
@@ -241,11 +241,11 @@ describe("accountDeletionService", () => {
       data: snapshot.memberships,
     });
     expect(mocks.tx.weddingInvitation.createMany).toHaveBeenCalledWith({
-      data: snapshot.sentInvitations,
+      data: snapshot.sentMemberInvitations,
     });
     expect(mocks.tx.userPreference.create).toHaveBeenCalled();
     expect(mocks.tx.weddingInvitation.updateMany).toHaveBeenCalledWith({
-      where: { id: { in: snapshot.acceptedInvitationIds } },
+      where: { id: { in: snapshot.acceptedMemberInvitationIds } },
       data: { acceptedByUserId: "user_1" },
     });
     expect(mocks.tx.task.updateMany).toHaveBeenCalledWith({

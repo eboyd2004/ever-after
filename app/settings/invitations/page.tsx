@@ -1,13 +1,13 @@
 import { PageHeader } from "@/src/components/shared/page-header";
-import { InvitationManagement } from "@/src/components/settings/invitation-management";
+import { WorkspaceInvitationManagement } from "@/src/components/settings/workspace-invitation-management";
 import { Card } from "@/src/components/shared/ui";
 import { WeddingRequiredState } from "@/src/components/shared/wedding-required-state";
 import { getWeddingPageContext } from "@/src/server/auth/get-wedding-page-context";
-import { listWeddingInvitations } from "@/src/server/actions/wedding/wedding.actions";
+import { listWeddingMemberInvitations } from "@/src/server/actions/wedding/workspace-invitation.actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function InvitationsSettingsPage() {
+export default async function WorkspaceInvitationsSettingsPage() {
   const context = await getWeddingPageContext();
 
   if (!context) {
@@ -15,19 +15,19 @@ export default async function InvitationsSettingsPage() {
   }
 
   const isOwner = context.role === "OWNER";
-  const invitationResult = isOwner ? await listWeddingInvitations() : null;
+  const memberInvitationResult = isOwner ? await listWeddingMemberInvitations() : null;
 
   return (
     <div className="space-y-6">
       <PageHeader
         description="Manage pending workspace invitations for this wedding."
         eyebrow="Workspace settings"
-        title="Invitations"
+        title="Member invitations"
       />
       {isOwner ? (
         <Card className="p-5 sm:p-6">
-          <InvitationManagement
-            initialInvitations={invitationResult?.success ? invitationResult.data : []}
+          <WorkspaceInvitationManagement
+            initialMemberInvitations={memberInvitationResult?.success ? memberInvitationResult.data : []}
           />
         </Card>
       ) : (

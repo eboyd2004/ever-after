@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { SignIn } from "@clerk/nextjs";
 import {
-  getSafeInvitationEmail,
-  getSafeInvitationReturnPath,
-} from "@/src/server/auth/safe-invitation-return";
+  getSafeWorkspaceInvitationEmail,
+  getSafeWorkspaceInvitationReturnPath,
+} from "@/src/server/auth/safe-workspace-invitation-return";
 
 export default async function SignInPage({
   searchParams,
@@ -15,18 +15,18 @@ export default async function SignInPage({
     ? params.redirect_url[0]
     : params.redirect_url;
   const emailValue = Array.isArray(params.email) ? params.email[0] : params.email;
-  const invitationRedirect = getSafeInvitationReturnPath(redirectValue);
-  const invitationEmail = getSafeInvitationEmail(emailValue);
+  const workspaceInvitationRedirect = getSafeWorkspaceInvitationReturnPath(redirectValue);
+  const workspaceInvitationEmail = getSafeWorkspaceInvitationEmail(emailValue);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#FAFAF8] px-4 py-12">
       <div className="w-full max-w-[430px]">
         <AuthBrand />
         <SignIn
-          fallbackRedirectUrl={invitationRedirect ?? "/dashboard"}
-          forceRedirectUrl={invitationRedirect ?? undefined}
+          fallbackRedirectUrl={workspaceInvitationRedirect ?? "/dashboard"}
+          forceRedirectUrl={workspaceInvitationRedirect ?? undefined}
           initialValues={
-            invitationEmail ? { emailAddress: invitationEmail } : undefined
+            workspaceInvitationEmail ? { emailAddress: workspaceInvitationEmail } : undefined
           }
           path="/sign-in"
           routing="path"

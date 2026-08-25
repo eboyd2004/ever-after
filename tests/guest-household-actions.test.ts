@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   requireRole: vi.fn(),
+  revalidatePath: vi.fn(),
   createGuestWithPlusOne: vi.fn(),
   addPlusOne: vi.fn(),
   deleteGuest: vi.fn(),
@@ -10,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   createHousehold: vi.fn(),
 }));
 
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock("../src/server/auth/authorization", () => ({
   PermissionDeniedError: class PermissionDeniedError extends Error {
     constructor() {
@@ -75,6 +76,20 @@ describe("guest and household mutation authorization", () => {
       error: "You do not have permission to perform this action.",
     });
     expect(mocks.deleteGuest).not.toHaveBeenCalled();
+  });
+
+  it("invalidates dashboard counts after guest and household deletions", async () => {
+    mocks.requireRole.mockResolvedValue({
+      wedding: { id: "wedding_1" },
+      role: "EDITOR",
+    });
+    mocks.deleteGuest.mockResolvedValue(undefined);
+    mocks.deleteHousehold.mockResolvedValue(undefined);
+
+    await deleteGuest(guestId);
+    await deleteHousehold(householdId);
+
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/dashboard");
   });
 
   it("keeps guest section assignment changes rejected for VIEWER users", async () => {

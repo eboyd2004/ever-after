@@ -105,7 +105,7 @@ describe("guestListRepository", () => {
     ]);
   });
 
-  it("loads sequential, wedding-scoped list reads and maps only list data", async () => {
+  it("loads wedding-scoped list reads concurrently and preserves the list shape", async () => {
     const order: string[] = [];
     mocks.prisma.guest.findMany.mockImplementation(async () => {
       order.push("guests");
@@ -161,6 +161,45 @@ describe("guestListRepository", () => {
       where: { weddingId },
       orderBy: [{ name: "asc" }],
       select: { id: true, name: true },
+    });
+  });
+
+  it("starts all independent list reads before any one read resolves", async () => {
+    const started: string[] = [];
+    let resolveGuests!: (value: unknown[]) => void;
+    let resolveHouseholds!: (value: unknown[]) => void;
+    let resolveTags!: (value: unknown[]) => void;
+
+    const guests = new Promise<unknown[]>((resolve) => { resolveGuests = resolve; });
+    const households = new Promise<unknown[]>((resolve) => { resolveHouseholds = resolve; });
+    const tags = new Promise<unknown[]>((resolve) => { resolveTags = resolve; });
+
+    mocks.prisma.guest.findMany.mockImplementation(() => {
+      started.push("guests");
+      return guests;
+    });
+    mocks.prisma.household.findMany.mockImplementation(() => {
+      started.push("households");
+      return households;
+    });
+    mocks.prisma.guestTag.findMany.mockImplementation(() => {
+      started.push("tags");
+      return tags;
+    });
+
+    const resultPromise = guestListRepository.getGuestList(weddingId);
+    await Promise.resolve();
+
+    expect(started).toEqual(["guests", "households", "tags"]);
+
+    resolveGuests([standaloneGuestRecord()]);
+    resolveHouseholds([householdRecord()]);
+    resolveTags([{ id: "tag_1", name: "VIP" }]);
+
+    await expect(resultPromise).resolves.toMatchObject({
+      standaloneGuests: [expect.objectContaining({ id: "guest_1" })],
+      households: [expect.objectContaining({ id: "household_1" })],
+      tags: [{ id: "tag_1", name: "VIP" }],
     });
   });
 

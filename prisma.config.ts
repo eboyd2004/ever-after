@@ -2,11 +2,10 @@ import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
 const directUrl = process.env.DIRECT_URL;
+const shadowDatabaseUrl = process.env.SHADOW_DATABASE_URL;
 
 if (!directUrl) {
-  throw new Error(
-    "DIRECT_URL is required to load prisma.config.ts. Set DIRECT_URL before running Prisma CLI commands.",
-  );
+  throw new Error("DIRECT_URL is required");
 }
 
 export default defineConfig({
@@ -17,5 +16,6 @@ export default defineConfig({
   },
   datasource: {
     url: directUrl,
+    shadowDatabaseUrl,
   },
 });

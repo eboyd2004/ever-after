@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { ConfirmDialog } from "../shared/confirm-dialog";
@@ -29,7 +28,6 @@ export function TaskActions({
   task,
   updateAction,
 }: TaskActionsProps) {
-  const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -50,7 +48,6 @@ export function TaskActions({
         }
 
         setDeleteOpen(false);
-        router.refresh();
       } catch {
         setError("Unable to delete the task. Please try again.");
         setDeleteOpen(false);
@@ -136,7 +133,6 @@ export function TaskActions({
           onCancel={() => setEditOpen(false)}
           onSuccess={() => {
             setEditOpen(false);
-            router.refresh();
           }}
         />
       </Modal>

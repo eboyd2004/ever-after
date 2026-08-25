@@ -352,10 +352,23 @@ function parseOptionalPlusOne(input: unknown):
   };
 }
 
-function revalidateGuestPaths(guestId?: string) {
+function revalidateGuestPaths(
+  guestIds?: string | readonly string[],
+  options: { dashboard?: boolean } = {},
+) {
   revalidatePath("/guests");
   revalidatePath("/guests/households");
-  if (guestId) revalidatePath(`/guests/${guestId}`);
+  if (options.dashboard) revalidatePath("/dashboard");
+
+  const ids = guestIds === undefined
+    ? []
+    : Array.isArray(guestIds)
+      ? guestIds
+      : [guestIds];
+
+  for (const guestId of new Set(ids)) {
+    revalidatePath(`/guests/${guestId}`);
+  }
 }
 
 async function runGuestAction<T>(
@@ -480,7 +493,7 @@ export async function createGuest(
       primarySectionIds: sectionIds,
       plusOneSectionIds: plusOneInput?.sectionIds,
     });
-    revalidateGuestPaths(guest.id);
+    revalidateGuestPaths(guest.id, { dashboard: true });
     return mapGuest(guest);
   });
 }
@@ -504,7 +517,7 @@ export async function addPlusOne(
       plusOne.input,
       plusOne.sectionIds,
     );
-    revalidateGuestPaths(guest.id);
+    revalidateGuestPaths(guest.id, { dashboard: true });
     return mapGuest(guest);
   });
 }
@@ -524,8 +537,10 @@ export async function attachExistingGuestAsPlusOne(
       parsedValue(parsedParentId),
       parsedValue(parsedPlusOneId),
     );
-    revalidateGuestPaths(parsedValue(parsedParentId));
-    revalidateGuestPaths(parsedValue(parsedPlusOneId));
+    revalidateGuestPaths([
+      parsedValue(parsedParentId),
+      parsedValue(parsedPlusOneId),
+    ]);
     return mapGuest(guest);
   });
 }
@@ -564,7 +579,7 @@ export async function deleteGuest(
 
   return runGuestAction("delete guest", "edit", async (weddingId) => {
     await guestRepository.deleteGuest(weddingId, parsedValue(parsedId));
-    revalidateGuestPaths(parsedValue(parsedId));
+    revalidateGuestPaths(parsedValue(parsedId), { dashboard: true });
     return null;
   });
 }

@@ -337,9 +337,13 @@ function parseGuestIds(
   return { value: ids.map((id) => parsedValue(id) as string) };
 }
 
-function revalidateHouseholdPaths(householdId?: string) {
+function revalidateHouseholdPaths(
+  householdId?: string,
+  options: { dashboard?: boolean } = {},
+) {
   revalidatePath("/guests");
   revalidatePath("/guests/households");
+  if (options.dashboard) revalidatePath("/dashboard");
   if (householdId) revalidatePath(`/guests/households/${householdId}`);
 }
 
@@ -426,7 +430,7 @@ export async function createHouseholdWithMembers(
         weddingId,
         parsed.value,
       );
-      revalidateHouseholdPaths(household.id);
+      revalidateHouseholdPaths(household.id, { dashboard: true });
       return mapHousehold(household);
     },
   );
@@ -460,7 +464,7 @@ export async function deleteHousehold(
 
   return runHouseholdAction("delete household", "edit", async (weddingId) => {
     await householdRepository.deleteHousehold(weddingId, parsedValue(parsedId));
-    revalidateHouseholdPaths(parsedValue(parsedId));
+    revalidateHouseholdPaths(parsedValue(parsedId), { dashboard: true });
     return null;
   });
 }

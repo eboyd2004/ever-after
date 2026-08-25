@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Fragment, useState, useTransition } from "react";
 
 import { removePlusOneRelationship } from "@/src/server/actions/guests/guest.actions";
@@ -356,7 +355,6 @@ function RemovePlusOneButton({
   guestId: string;
   guestName: string;
 }) {
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -370,7 +368,6 @@ function RemovePlusOneButton({
         return;
       }
       setIsConfirmOpen(false);
-      router.refresh();
     });
   }
 

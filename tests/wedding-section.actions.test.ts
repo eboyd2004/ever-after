@@ -110,6 +110,9 @@ describe("wedding section actions", () => {
       name: "Evening reception",
       description: "Music and dancing",
     });
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/guests");
+    expect(mocks.revalidatePath).not.toHaveBeenCalledWith("/dashboard");
+    expect(mocks.revalidatePath).not.toHaveBeenCalledWith("/", "layout");
   });
 
   it("initializes defaults only through an authorized edit action", async () => {

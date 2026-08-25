@@ -21,7 +21,7 @@ const protectedRoutes = [
 function isProtectedPath(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  // Invitation acceptance is public; the token and verified Clerk email are
+  // Workspace invitation acceptance is public; the token and verified Clerk email are
   // validated by the acceptance service before any membership is created.
   if (pathname === "/invitations/accept") return false;
 

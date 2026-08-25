@@ -7,7 +7,7 @@ import {
   deleteTask as deleteTaskAction,
   getCategories,
   getAssignableMembers,
-  getTasks,
+  getTasksForWedding,
   reopenTask as reopenTaskAction,
   updateCategory as updateCategoryAction,
   updateTask as updateTaskAction,
@@ -57,29 +57,35 @@ async function loadChecklistData(
   { data: LoadedChecklistData } | { error: string }
 > {
   try {
-    const categoriesResult = await getCategories();
+    const [categoriesResult, membersResult, tasksResult] = await Promise.all([
+      getCategories(),
+      getAssignableMembers(),
+      getTasksForWedding(),
+    ]);
 
     if (!categoriesResult.success) {
       return { error: categoriesResult.error };
     }
 
-    const categories: LoadedChecklistData["categories"] = [];
-
-    for (const category of categoriesResult.data) {
-      const tasksResult = await getTasks(category.id);
-
-      if (!tasksResult.success) {
-        return { error: tasksResult.error };
-      }
-
-      categories.push({ category, tasks: tasksResult.data });
-    }
-
-    const membersResult = await getAssignableMembers();
-
     if (!membersResult.success) {
       return { error: membersResult.error };
     }
+
+    if (!tasksResult.success) {
+      return { error: tasksResult.error };
+    }
+
+    const tasksByCategory = new Map<string, TaskActionData[]>();
+    for (const task of tasksResult.data) {
+      const categoryTasks = tasksByCategory.get(task.categoryId) ?? [];
+      categoryTasks.push(task);
+      tasksByCategory.set(task.categoryId, categoryTasks);
+    }
+
+    const categories = categoriesResult.data.map((category) => ({
+      category,
+      tasks: tasksByCategory.get(category.id) ?? [],
+    }));
 
     return { data: { context, categories, members: membersResult.data } };
   } catch (error) {
