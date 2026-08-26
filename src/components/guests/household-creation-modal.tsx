@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useRef, useState, useTransition, type ChangeEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import {
   createHouseholdWithMembers,
@@ -11,6 +12,7 @@ import type { HouseholdListTag } from "@/src/server/repositories/household-list.
 import { Button, Input, Select } from "@/src/components/shared/ui";
 import { Modal } from "@/src/components/shared/modal";
 import { ConfirmDialog } from "@/src/components/shared/confirm-dialog";
+import { invalidateGuestsAndDashboardQueries } from "./guest-query-cache";
 
 const MAX_MEMBERS = 20;
 
@@ -44,11 +46,14 @@ export function HouseholdCreationModal({
   open,
   onClose,
   tags,
+  weddingId,
 }: {
   open: boolean;
   onClose: () => void;
   tags: HouseholdListTag[];
+  weddingId: string;
 }) {
+  const queryClient = useQueryClient();
   const formRef = useRef<HTMLFormElement>(null);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -128,6 +133,7 @@ export function HouseholdCreationModal({
 
       reset();
       onClose();
+      void invalidateGuestsAndDashboardQueries(queryClient, weddingId);
     });
   }
 

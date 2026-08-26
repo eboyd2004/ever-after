@@ -1,18 +1,23 @@
 "use client";
 
 import { FormEvent, useState, useTransition } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { createGuestTag } from "@/src/server/actions/guests/guest-tag.actions";
 import type { GuestListTag } from "@/src/server/repositories/guest-list.repository";
 import { Button } from "@/src/components/shared/ui";
+import { invalidateGuestsQuery } from "./guest-query-cache";
 
 export function GuestTagManager({
   tags,
   canEdit,
+  weddingId,
 }: {
   tags: GuestListTag[];
   canEdit: boolean;
+  weddingId: string;
 }) {
+  const queryClient = useQueryClient();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -38,6 +43,7 @@ export function GuestTagManager({
 
       form.reset();
       setMessage("Tag created. It is now available when editing a guest.");
+      void invalidateGuestsQuery(queryClient, weddingId);
     });
   }
 

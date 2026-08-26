@@ -71,16 +71,6 @@ textarea {
   }
 }
 
-@keyframes app-loading-enter {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
-}
-
 @keyframes modal-surface-enter {
   from {
     opacity: 0;
@@ -98,21 +88,11 @@ textarea {
 }
 
 .page-transition {
-  opacity: 0;
-  transition: opacity 100ms ease-out;
-}
-
-.page-transition-visible {
   opacity: 1;
-}
-
-.page-loading {
-  animation: app-loading-enter 180ms ease-out both;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .page-transition,
-  .page-loading,
   .modal-surface {
     animation: none;
     opacity: 1;

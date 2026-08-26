@@ -6,7 +6,9 @@ import { useState, type ReactNode } from "react";
 import { UserButton } from "@clerk/nextjs";
 
 import { Icon, type IconName } from "./icons";
+import { DelayedLoadingProvider } from "./delayed-loading";
 import { PageTransition } from "./page-transition";
+import { WorkspaceProvider } from "./workspace-context";
 import {
   WeddingSwitcher,
   type WeddingSwitcherOption,
@@ -18,10 +20,16 @@ export type AppShellContext = {
     weddingName: string;
     partnerNames: string;
     weddingDate: string;
+    weddingDateIso: string;
+    timezone: string;
+    locationSummary: string | null;
     countdown: string;
   } | null;
+  onboardingSkipped: boolean;
+  role: "OWNER" | "EDITOR" | "VIEWER" | null;
   availableWeddings: WeddingSwitcherOption[];
   user: {
+    firstName: string;
     userName: string;
     userEmail: string;
     userInitials: string;
@@ -61,7 +69,8 @@ export function AppShell({ children, context }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen bg-[#FAFAF8] text-[#1C1C1C] md:h-screen md:overflow-hidden">
+    <WorkspaceProvider value={context}>
+      <div className="flex min-h-screen bg-[#FAFAF8] text-[#1C1C1C] md:h-screen md:overflow-hidden">
       {mobileOpen ? (
         <button
           aria-label="Close navigation"
@@ -177,11 +186,16 @@ export function AppShell({ children, context }: AppShellProps) {
 
         <main className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-8 sm:px-6 md:px-8">
           <div className="mx-auto w-full max-w-[1440px]">
-            <PageTransition>{children}</PageTransition>
+            <DelayedLoadingProvider>
+              <PageTransition weddingId={context?.wedding?.id ?? null}>
+                {children}
+              </PageTransition>
+            </DelayedLoadingProvider>
           </div>
         </main>
       </div>
-    </div>
+      </div>
+    </WorkspaceProvider>
   );
 }
 

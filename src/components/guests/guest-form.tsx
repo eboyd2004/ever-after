@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState, useTransition } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import {
   addPlusOne,
@@ -19,6 +20,10 @@ import type { GuestListSection } from "@/src/server/repositories/guest-list.repo
 import { Button, Select } from "@/src/components/shared/ui";
 import { ConfirmDialog } from "@/src/components/shared/confirm-dialog";
 import { GuestSectionSelector } from "./guest-section-selector";
+import {
+  invalidateGuestsAndDashboardQueries,
+  invalidateGuestsQuery,
+} from "./guest-query-cache";
 
 type GuestFormProps = {
   guest?: GuestActionData;
@@ -26,6 +31,7 @@ type GuestFormProps = {
   sections: GuestListSection[];
   tags: GuestTagActionData[];
   existingGuests?: Pick<GuestActionData, "id" | "firstName" | "lastName">[];
+  weddingId: string;
 };
 
 export function GuestForm({
@@ -34,8 +40,10 @@ export function GuestForm({
   sections,
   tags,
   existingGuests = [],
+  weddingId,
 }: GuestFormProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -82,6 +90,11 @@ export function GuestForm({
         return;
       }
 
+      if (guest) {
+        void invalidateGuestsQuery(queryClient, weddingId);
+      } else {
+        void invalidateGuestsAndDashboardQueries(queryClient, weddingId);
+      }
       setMessage(guest ? "Guest details saved." : "Guest added to your list.");
       if (!guest) {
         form.reset();
@@ -121,6 +134,7 @@ export function GuestForm({
       setSelectedPlusOneSections([]);
       setPlusOneOpen(false);
       setMessage("Existing guest attached as a plus-one.");
+      void invalidateGuestsQuery(queryClient, weddingId);
     });
   }
 
@@ -141,6 +155,7 @@ export function GuestForm({
       setSelectedPlusOneSections([]);
       setPlusOneOpen(false);
       setMessage("Plus-one added.");
+      void invalidateGuestsAndDashboardQueries(queryClient, weddingId);
     });
   }
 
@@ -160,6 +175,7 @@ export function GuestForm({
       }
 
       setConfirmation(null);
+      void invalidateGuestsAndDashboardQueries(queryClient, weddingId);
       router.push("/guests");
     });
   }

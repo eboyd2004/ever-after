@@ -25,9 +25,10 @@ export default async function WeddingSectionsSettingsPage() {
       />
       {result.success ? (
         <WeddingSectionsManager
-          initialSections={result.data}
-          readOnly={context.role === "VIEWER"}
-        />
+            initialSections={result.data}
+            readOnly={context.role === "VIEWER"}
+            weddingId={context.wedding.id}
+          />
       ) : (
         <Card className="border-[#E7C9C5] bg-[#FFF8F6] p-5 sm:p-6">
           <h2 className="text-base font-semibold text-[#5C211B]">

@@ -1,4 +1,8 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import type { FormEvent } from "react";
 
 import type {
   GuestListSection,
@@ -21,8 +25,27 @@ export function GuestFilters({
   sections: GuestListSection[];
   tags: GuestListTag[];
 }) {
+  const pathname = usePathname();
+  const router = useRouter();
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const params = new URLSearchParams();
+
+    for (const name of ["search", "sectionId", "ageGroup", "tagId"]) {
+      const value = formData.get(name);
+      if (typeof value === "string" && value.trim()) {
+        params.set(name, value.trim());
+      }
+    }
+
+    const query = params.toString();
+    router.push(query ? `${pathname}?${query}` : pathname);
+  }
+
   return (
-    <form className="grid gap-3 lg:grid-cols-[minmax(220px,1.5fr)_1fr_1fr_1fr_auto]" method="get">
+    <form className="grid gap-3 lg:grid-cols-[minmax(220px,1.5fr)_1fr_1fr_1fr_auto]" method="get" onSubmit={submit}>
       <Input defaultValue={search} name="search" placeholder="Search guests or households…" />
       <Select defaultValue={sectionId} name="sectionId">
         <option value="">All sections</option>

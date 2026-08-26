@@ -38,6 +38,7 @@ describe("guest wedding section controls", () => {
       <GuestTable
         canEdit={false}
         households={[]}
+        weddingId="wedding_1"
         standaloneGuests={[
           {
             id: "guest_1",

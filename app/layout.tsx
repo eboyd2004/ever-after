@@ -4,7 +4,9 @@ import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 
 import { AuthBoundary } from "@/src/components/auth/auth-boundary";
+import { QueryProvider } from "@/src/components/providers/query-provider";
 import { type AppShellContext } from "@/src/components/shared/app-shell";
+import { getOnboardingState } from "@/src/server/auth/get-onboarding-state";
 import {
   AuthenticationRequiredError,
   getAuthenticatedUser,
@@ -82,8 +84,10 @@ async function getShellContext(): Promise<AppShellContext | null> {
   }
 
   let wedding: AppShellContext["wedding"] = null;
+  let onboardingSkipped = true;
 
   if (activeWeddingContext) {
+    const { ceremonyLocation, receptionLocation } = activeWeddingContext.wedding;
     wedding = {
       id: activeWeddingContext.wedding.id,
       weddingName: activeWeddingContext.wedding.name,
@@ -92,8 +96,20 @@ async function getShellContext(): Promise<AppShellContext | null> {
         activeWeddingContext.wedding.weddingDate,
         activeWeddingContext.wedding.timezone,
       ),
+      weddingDateIso: activeWeddingContext.wedding.weddingDate.toISOString(),
+      timezone: activeWeddingContext.wedding.timezone,
+      locationSummary: [ceremonyLocation, receptionLocation]
+        .filter((location): location is string => Boolean(location))
+        .join(" · ") || null,
       countdown: formatCountdown(activeWeddingContext.wedding.weddingDate),
     };
+  } else if (authenticatedUser) {
+    try {
+      ({ skipped: onboardingSkipped } = await getOnboardingState());
+    } catch (error) {
+      logger.error("[layout] onboarding state load failed", error);
+      onboardingSkipped = false;
+    }
   }
 
   const user = activeWeddingContext?.user ?? authenticatedUser?.user;
@@ -105,6 +121,8 @@ async function getShellContext(): Promise<AppShellContext | null> {
   const fallbackName = user.email;
 
   return {
+    onboardingSkipped,
+    role: activeWeddingContext?.role ?? null,
     wedding,
     availableWeddings: activeWeddingContext?.availableWeddings.map((availableWedding) => ({
       id: availableWedding.id,
@@ -112,6 +130,7 @@ async function getShellContext(): Promise<AppShellContext | null> {
       partnerNames: `${availableWedding.partnerOneName} & ${availableWedding.partnerTwoName}`,
     })) ?? [],
     user: {
+      firstName: user.firstName,
       userName:
         [user.firstName, user.lastName].filter(Boolean).join(" ") || fallbackName,
       userEmail: user.email,
@@ -136,7 +155,9 @@ export default async function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <ClerkProvider>
-          <AuthBoundary context={context}>{children}</AuthBoundary>
+          <QueryProvider>
+            <AuthBoundary context={context}>{children}</AuthBoundary>
+          </QueryProvider>
         </ClerkProvider>
       </body>
     </html>

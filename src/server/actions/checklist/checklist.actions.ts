@@ -850,6 +850,41 @@ export async function getTasksForWedding(): Promise<
   });
 }
 
+export type ChecklistReadData = {
+  categories: Array<{
+    category: CategoryActionData;
+    tasks: TaskActionData[];
+  }>;
+  members: AssignableMemberActionData[];
+};
+
+export async function getChecklistData(): Promise<
+  ActionResult<ChecklistReadData>
+> {
+  return runAction("load checklist", "read", async (context) => {
+    const [categories, members, tasks] = await Promise.all([
+      checklistRepository.getCategories(context.wedding.id),
+      checklistRepository.getActiveWeddingMembers(context.wedding.id),
+      checklistRepository.getTasksForWedding(context.wedding.id),
+    ]);
+
+    const tasksByCategory = new Map<string, TaskActionData[]>();
+    for (const task of tasks.map(mapTask)) {
+      const categoryTasks = tasksByCategory.get(task.categoryId) ?? [];
+      categoryTasks.push(task);
+      tasksByCategory.set(task.categoryId, categoryTasks);
+    }
+
+    return {
+      categories: categories.map((category) => ({
+        category: mapCategory(category),
+        tasks: tasksByCategory.get(category.id) ?? [],
+      })),
+      members: members.map(mapAssignableMember),
+    };
+  });
+}
+
 export async function createCategory(
   input: unknown,
 ): Promise<ActionResult<CategoryActionData>> {

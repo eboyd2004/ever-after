@@ -64,6 +64,7 @@ export default async function HouseholdDetailPage({
                 lockedHouseholdId={household.id}
                 tags={tagsResult.data}
                 sections={sectionsResult.data.filter((section) => section.active)}
+                weddingId={context.wedding.id}
               />
             ) : null}
           </>
@@ -95,7 +96,7 @@ export default async function HouseholdDetailPage({
         </Card>
 
         <Card className="p-5 sm:p-6">
-          <HouseholdMembers canEdit={canEdit} household={household} guestsWithoutHousehold={guestsWithoutHousehold} />
+          <HouseholdMembers canEdit={canEdit} household={household} guestsWithoutHousehold={guestsWithoutHousehold} weddingId={context.wedding.id} />
         </Card>
       </section>
 
@@ -105,7 +106,7 @@ export default async function HouseholdDetailPage({
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#2D5A27]">Edit household</p>
             <h2 className="mt-1 text-lg font-semibold text-[#1C1C1C]">Update address or notes</h2>
           </div>
-          <HouseholdForm household={household} />
+          <HouseholdForm household={household} weddingId={context.wedding.id} />
         </Card>
       ) : null}
     </div>

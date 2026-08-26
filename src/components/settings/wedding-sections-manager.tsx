@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import {
   createWeddingSection,
@@ -14,6 +15,7 @@ import {
 import { ConfirmDialog } from "@/src/components/shared/confirm-dialog";
 import { Badge, Button, Card, Input } from "@/src/components/shared/ui";
 import type { WeddingSectionData } from "@/src/server/repositories/wedding-section.repository";
+import { invalidateGuestsQuery } from "@/src/components/guests/guest-query-cache";
 
 const MAX_SECTION_NAME_LENGTH = 100;
 const MAX_SECTION_DESCRIPTION_LENGTH = 500;
@@ -21,10 +23,13 @@ const MAX_SECTION_DESCRIPTION_LENGTH = 500;
 export function WeddingSectionsManager({
   initialSections,
   readOnly = false,
+  weddingId,
 }: {
   initialSections: WeddingSectionData[];
   readOnly?: boolean;
+  weddingId: string;
 }) {
+  const queryClient = useQueryClient();
   const [sections, setSections] = useState(initialSections);
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
@@ -46,6 +51,7 @@ export function WeddingSectionsManager({
     }
 
     onSuccess(result.data);
+    void invalidateGuestsQuery(queryClient, weddingId);
     return true;
   }
 

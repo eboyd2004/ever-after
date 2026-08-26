@@ -7,7 +7,13 @@ import { Button } from "@/src/components/shared/ui";
 import { Icon } from "@/src/components/shared/icons";
 import { HouseholdCreationModal } from "./household-creation-modal";
 
-export function HouseholdCreationTrigger({ tags }: { tags: HouseholdListTag[] }) {
+export function HouseholdCreationTrigger({
+  tags,
+  weddingId,
+}: {
+  tags: HouseholdListTag[];
+  weddingId: string;
+}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -16,7 +22,12 @@ export function HouseholdCreationTrigger({ tags }: { tags: HouseholdListTag[] })
         <Icon name="plus" size={15} />
         Add household
       </Button>
-      <HouseholdCreationModal onClose={() => setOpen(false)} open={open} tags={tags} />
+      <HouseholdCreationModal
+        onClose={() => setOpen(false)}
+        open={open}
+        tags={tags}
+        weddingId={weddingId}
+      />
     </>
   );
 }

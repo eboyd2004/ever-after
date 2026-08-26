@@ -1,5 +1,5 @@
-import { PageLoading } from "@/src/components/shared/page-loading";
+import { DelayedLoadingFallback } from "@/src/components/shared/delayed-loading";
 
 export default function SettingsLoading() {
-  return <PageLoading rows={2} />;
+  return <DelayedLoadingFallback />;
 }

@@ -1,5 +1,5 @@
-import { PageLoading } from "@/src/components/shared/page-loading";
+import { DelayedLoadingFallback } from "@/src/components/shared/delayed-loading";
 
 export default function DashboardLoading() {
-  return <PageLoading rows={5} />;
+  return <DelayedLoadingFallback area="dashboard" />;
 }

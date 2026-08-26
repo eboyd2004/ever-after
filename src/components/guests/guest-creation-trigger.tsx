@@ -15,12 +15,14 @@ export function GuestCreationTrigger({
   households,
   sections,
   tags,
+  weddingId,
   buttonLabel = "Add guest",
   lockedHouseholdId,
 }: {
   households: Pick<HouseholdData, "id" | "name">[];
   sections: GuestListSection[];
   tags: GuestListTag[];
+  weddingId: string;
   buttonLabel?: string;
   lockedHouseholdId?: string;
 }) {
@@ -39,6 +41,7 @@ export function GuestCreationTrigger({
         open={open}
         sections={sections}
         tags={tags}
+        weddingId={weddingId}
       />
     </>
   );

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { FormEvent, useState, useTransition } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import {
   createHousehold,
@@ -12,9 +13,20 @@ import {
 } from "@/src/server/actions/guests/household.actions";
 import { Button } from "@/src/components/shared/ui";
 import { ConfirmDialog } from "@/src/components/shared/confirm-dialog";
+import {
+  invalidateGuestsAndDashboardQueries,
+  invalidateGuestsQuery,
+} from "./guest-query-cache";
 
-export function HouseholdForm({ household }: { household?: HouseholdData }) {
+export function HouseholdForm({
+  household,
+  weddingId,
+}: {
+  household?: HouseholdData;
+  weddingId: string;
+}) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -47,6 +59,11 @@ export function HouseholdForm({ household }: { household?: HouseholdData }) {
         return;
       }
 
+      if (household) {
+        void invalidateGuestsQuery(queryClient, weddingId);
+      } else {
+        void invalidateGuestsAndDashboardQueries(queryClient, weddingId);
+      }
       setMessage(household ? "Household details saved." : "Household created.");
       if (!household) form.reset();
     });
@@ -64,6 +81,7 @@ export function HouseholdForm({ household }: { household?: HouseholdData }) {
       }
 
       setIsDeleteOpen(false);
+      void invalidateGuestsAndDashboardQueries(queryClient, weddingId);
       router.push("/guests/households");
     });
   }

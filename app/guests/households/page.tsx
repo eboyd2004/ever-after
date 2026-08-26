@@ -46,7 +46,7 @@ export default async function HouseholdsPage() {
               <Icon name="users" size={15} />
               Guest list
             </Link>
-            {canEdit ? <HouseholdCreationTrigger tags={result.tags} /> : null}
+            {canEdit ? <HouseholdCreationTrigger tags={result.tags} weddingId={context.wedding.id} /> : null}
           </>
         }
       />

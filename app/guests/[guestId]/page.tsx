@@ -155,6 +155,7 @@ export default async function GuestDetailPage({
             households={households}
             sections={sectionsResult.data}
             tags={tags}
+            weddingId={context.wedding.id}
           />
         </Card>
       ) : null}

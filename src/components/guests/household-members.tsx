@@ -2,6 +2,7 @@
 
 import { FormEvent, useState, useTransition } from "react";
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 
 import {
   addGuestsToHousehold,
@@ -13,16 +14,20 @@ import {
 import type { GuestActionData } from "@/src/server/actions/guests/guest.actions";
 import { Badge, Button, Select } from "@/src/components/shared/ui";
 import { ConfirmDialog } from "@/src/components/shared/confirm-dialog";
+import { invalidateGuestsQuery } from "./guest-query-cache";
 
 export function HouseholdMembers({
   household,
   guestsWithoutHousehold,
   canEdit = true,
+  weddingId,
 }: {
   household: HouseholdData;
   guestsWithoutHousehold: GuestActionData[];
   canEdit?: boolean;
+  weddingId: string;
 }) {
+  const queryClient = useQueryClient();
   const [isPending, startTransition] = useTransition();
   const [selectedGuestIds, setSelectedGuestIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +51,7 @@ export function HouseholdMembers({
         return;
       }
       setSelectedGuestIds([]);
+      void invalidateGuestsQuery(queryClient, weddingId);
     });
   }
 
@@ -81,6 +87,7 @@ export function HouseholdMembers({
         return;
       }
       setConfirmation(null);
+      void invalidateGuestsQuery(queryClient, weddingId);
     });
   }
 

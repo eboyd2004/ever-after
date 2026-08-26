@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Fragment, useState, useTransition } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { removePlusOneRelationship } from "@/src/server/actions/guests/guest.actions";
 import type {
@@ -13,6 +14,7 @@ import type {
 import { Icon } from "@/src/components/shared/icons";
 import { ConfirmDialog } from "@/src/components/shared/confirm-dialog";
 import { Badge, Card, EmptyState } from "@/src/components/shared/ui";
+import { invalidateGuestsQuery } from "./guest-query-cache";
 
 type GuestRowData = GuestListStandaloneGuest | GuestListPlusOne;
 
@@ -21,11 +23,13 @@ export function GuestTable({
   households,
   standaloneGuests,
   search = "",
+  weddingId,
 }: {
   canEdit: boolean;
   households: GuestListHousehold[];
   standaloneGuests: GuestListStandaloneGuest[];
   search?: string;
+  weddingId: string;
 }) {
   const [expandedHouseholds, setExpandedHouseholds] = useState<Set<string>>(
     () => (search.trim() ? new Set(households.map((household) => household.id)) : new Set()),
@@ -64,12 +68,13 @@ export function GuestTable({
             key={household.id}
             onToggle={() => toggleHousehold(household.id)}
             search={search}
+            weddingId={weddingId}
           />
         ))}
 
         {standaloneGroups.map(({ guest, plusOnes }) => (
           <div className="border-b border-[#F0EFEA] px-0 last:border-b-0" key={guest.id}>
-            <StandaloneGuestRow canEdit={canEdit} guest={guest} search={search} />
+            <StandaloneGuestRow canEdit={canEdit} guest={guest} search={search} weddingId={weddingId} />
             {plusOnes.length > 0 ? (
               <div className="pb-4">
                 {plusOnes.map((plusOne) => (
@@ -80,6 +85,7 @@ export function GuestTable({
                     relationshipLabel={`Plus-one of ${guest.firstName} ${guest.lastName}`}
                     canEdit={canEdit}
                     search={search}
+                    weddingId={weddingId}
                   />
                 ))}
               </div>
@@ -97,12 +103,14 @@ function HouseholdItem({
   expanded,
   onToggle,
   search,
+  weddingId,
 }: {
   canEdit: boolean;
   household: GuestListHousehold;
   expanded: boolean;
   onToggle: () => void;
   search: string;
+  weddingId: string;
 }) {
   const aggregateTags = Array.from(
     new Map(
@@ -177,6 +185,7 @@ function HouseholdItem({
                     guest={guest}
                     isPrimary={guest.id === household.primaryGuestId}
                     search={search}
+                    weddingId={weddingId}
                   />
                   {plusOnes.map((plusOne) => (
                     <HouseholdMemberRow
@@ -187,6 +196,7 @@ function HouseholdItem({
                       nested
                       relationshipLabel={`Plus-one of ${guest.firstName} ${guest.lastName}`}
                       search={search}
+                      weddingId={weddingId}
                     />
                   ))}
                 </Fragment>
@@ -208,6 +218,7 @@ function HouseholdMemberRow({
   nested = false,
   relationshipLabel,
   search,
+  weddingId,
 }: {
   canEdit: boolean;
   guest: GuestListHouseholdGuest;
@@ -215,6 +226,7 @@ function HouseholdMemberRow({
   nested?: boolean;
   relationshipLabel?: string;
   search: string;
+  weddingId: string;
 }) {
   const highlighted = search.length > 0 && memberMatchesSearch(guest, search);
   const relationshipText = relationshipLabel ?? (guest.plusOneFor
@@ -246,7 +258,7 @@ function HouseholdMemberRow({
         </Link>
         {nested && canEdit ? (
           <div className="mt-3 flex flex-wrap items-center gap-3 text-xs font-semibold">
-            <RemovePlusOneButton guestId={guest.id} guestName={`${guest.firstName} ${guest.lastName}`} />
+            <RemovePlusOneButton guestId={guest.id} guestName={`${guest.firstName} ${guest.lastName}`} weddingId={weddingId} />
           </div>
         ) : null}
       </div>
@@ -260,12 +272,14 @@ function StandaloneGuestRow({
   nested = false,
   relationshipLabel,
   search,
+  weddingId,
 }: {
   canEdit: boolean;
   guest: GuestRowData;
   nested?: boolean;
   relationshipLabel?: string;
   search: string;
+  weddingId: string;
 }) {
   const relationshipText = relationshipLabel ?? (
     guest.plusOneFor
@@ -294,7 +308,7 @@ function StandaloneGuestRow({
         </Link>
         {nested && canEdit ? (
           <div className="mt-3 flex flex-wrap items-center gap-3 text-xs font-semibold">
-            <RemovePlusOneButton guestId={guest.id} guestName={`${guest.firstName} ${guest.lastName}`} />
+            <RemovePlusOneButton guestId={guest.id} guestName={`${guest.firstName} ${guest.lastName}`} weddingId={weddingId} />
           </div>
         ) : null}
       </div>
@@ -351,10 +365,13 @@ function groupGuests(guests: GuestListStandaloneGuest[]) {
 function RemovePlusOneButton({
   guestId,
   guestName,
+  weddingId,
 }: {
   guestId: string;
   guestName: string;
+  weddingId: string;
 }) {
+  const queryClient = useQueryClient();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -368,6 +385,7 @@ function RemovePlusOneButton({
         return;
       }
       setIsConfirmOpen(false);
+      void invalidateGuestsQuery(queryClient, weddingId);
     });
   }
 

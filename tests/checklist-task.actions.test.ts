@@ -4,6 +4,8 @@ const mocks = vi.hoisted(() => ({
   requireRole: vi.fn(),
   getTask: vi.fn(),
   getTasksForWedding: vi.fn(),
+  getCategories: vi.fn(),
+  getActiveWeddingMembers: vi.fn(),
   getCategory: vi.fn(),
   getWeddingMember: vi.fn(),
   updateTask: vi.fn(),
@@ -39,6 +41,8 @@ vi.mock("../src/server/repositories/checklist.repository", () => ({
   checklistRepository: {
     getTask: mocks.getTask,
     getTasksForWedding: mocks.getTasksForWedding,
+    getCategories: mocks.getCategories,
+    getActiveWeddingMembers: mocks.getActiveWeddingMembers,
     getCategory: mocks.getCategory,
     getWeddingMember: mocks.getWeddingMember,
     updateTask: mocks.updateTask,
@@ -52,6 +56,7 @@ import { PermissionDeniedError } from "../src/server/auth/authorization";
 import {
   completeTask,
   deleteTask,
+  getChecklistData,
   getTasksForWedding,
   reopenTask,
   updateTask,
@@ -98,6 +103,11 @@ describe("checklist task actions", () => {
     });
     mocks.getTask.mockResolvedValue(task);
     mocks.getTasksForWedding.mockResolvedValue([task]);
+    mocks.getCategories.mockResolvedValue([{
+      ...task.category,
+      _count: { tasks: 1 },
+    }]);
+    mocks.getActiveWeddingMembers.mockResolvedValue([]);
     mocks.getCategory.mockResolvedValue(task.category);
     mocks.getWeddingMember.mockResolvedValue({
       id: "member_1",
@@ -146,6 +156,24 @@ describe("checklist task actions", () => {
         categoryId: "category_1",
       })],
     });
+    expect(mocks.getTasksForWedding).toHaveBeenCalledWith("wedding_1");
+  });
+
+  it("loads categories, members, and tasks in the single wedding-scoped checklist read", async () => {
+    const result = await getChecklistData();
+
+    expect(result).toMatchObject({
+      success: true,
+      data: {
+        categories: [{
+          category: { id: "category_1", weddingId: "wedding_1" },
+          tasks: [{ id: "task_1", weddingId: "wedding_1" }],
+        }],
+        members: [],
+      },
+    });
+    expect(mocks.getCategories).toHaveBeenCalledWith("wedding_1");
+    expect(mocks.getActiveWeddingMembers).toHaveBeenCalledWith("wedding_1");
     expect(mocks.getTasksForWedding).toHaveBeenCalledWith("wedding_1");
   });
 

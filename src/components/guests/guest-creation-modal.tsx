@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useRef, useState, useTransition, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { createGuest, type GuestActionResult, type GuestActionData } from "@/src/server/actions/guests/guest.actions";
 import type { HouseholdData } from "@/src/server/actions/guests/household.actions";
@@ -10,6 +11,7 @@ import { Button, Input, Select } from "@/src/components/shared/ui";
 import { Modal } from "@/src/components/shared/modal";
 import { ConfirmDialog } from "@/src/components/shared/confirm-dialog";
 import { GuestSectionSelector } from "./guest-section-selector";
+import { invalidateGuestsAndDashboardQueries } from "./guest-query-cache";
 
 type PlusOneDraft = {
   firstName: string;
@@ -38,6 +40,7 @@ export function GuestCreationModal({
   sections,
   tags,
   lockedHouseholdId,
+  weddingId,
 }: {
   open: boolean;
   onClose: () => void;
@@ -45,7 +48,9 @@ export function GuestCreationModal({
   sections: GuestListSection[];
   tags: GuestListTag[];
   lockedHouseholdId?: string;
+  weddingId: string;
 }) {
+  const queryClient = useQueryClient();
   const formRef = useRef<HTMLFormElement>(null);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -136,6 +141,7 @@ export function GuestCreationModal({
       setSelectedPlusOneSections([]);
       setPlusOneOpen(false);
       performClose();
+      void invalidateGuestsAndDashboardQueries(queryClient, weddingId);
     });
   }
 
